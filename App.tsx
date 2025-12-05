@@ -7,7 +7,6 @@ import StockOperationModal from './components/StockOperationModal';
 import Scrapped from './components/Scrapped';
 import Employees from './components/Employees';
 import Settings from './components/Settings';
-import Login from './components/Login';
 import { 
   getInventory, saveInventory, 
   getAssignments, saveAssignments,
@@ -18,7 +17,6 @@ import {
 import { Product, Assignment, ScrappedItem, OperationType, Employee } from './types';
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -42,10 +40,6 @@ const App: React.FC = () => {
     setEmployees(getEmployees());
     setCategories(getCategories());
   }, []);
-
-  const handleLogin = () => {
-    setIsAuthenticated(true);
-  };
 
   const handleSaveProduct = (product: Product) => {
     let updatedProducts;
@@ -179,10 +173,6 @@ const App: React.FC = () => {
         return <Dashboard products={products} />;
     }
   };
-
-  if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
-  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
