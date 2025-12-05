@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Lock, Loader2, UserPlus, LogIn, Mail } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -28,7 +29,6 @@ const Login: React.FC<LoginProps> = () => {
         if (error) throw error;
         if (data.user && !data.session) {
            setSuccessMsg("Account created! Please check your email to confirm your registration.");
-           // Don't switch back immediately so they can see the message
         } else if (data.session) {
            // Auto logged in (if email confirmation is off)
            window.location.reload(); 
@@ -60,13 +60,41 @@ const Login: React.FC<LoginProps> = () => {
           <p className="text-sm text-slate-400 font-light relative z-10">Stock Management System</p>
         </div>
 
-        <div className="p-8">
-          <div className="mb-6">
+        {/* New Explicit Tabs */}
+        <div className="flex border-b border-slate-200">
+          <button
+            type="button"
+            onClick={() => { setIsSignUp(false); setError(''); setSuccessMsg(''); }}
+            className={`flex-1 py-4 text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+                !isSignUp 
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' 
+                : 'text-slate-500 hover:text-slate-700 bg-white hover:bg-slate-50'
+            }`}
+          >
+            <LogIn size={16} />
+            Log In
+          </button>
+          <button
+            type="button"
+            onClick={() => { setIsSignUp(true); setError(''); setSuccessMsg(''); }}
+            className={`flex-1 py-4 text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+                isSignUp 
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50' 
+                : 'text-slate-500 hover:text-slate-700 bg-white hover:bg-slate-50'
+            }`}
+          >
+            <UserPlus size={16} />
+            Create Account
+          </button>
+        </div>
+
+        <div className="p-8 pt-6">
+          <div className="mb-6 text-center">
             <h2 className="text-xl font-bold text-slate-800">
-              {isSignUp ? 'Create Account' : 'Welcome Back'}
+              {isSignUp ? 'New User Registration' : 'Welcome Back'}
             </h2>
-            <p className="text-sm text-slate-500">
-              {isSignUp ? 'Register to access the inventory system' : 'Enter your credentials to access your account'}
+            <p className="text-sm text-slate-500 mt-1">
+              {isSignUp ? 'Create an ID to request system access' : 'Please sign in to continue'}
             </p>
           </div>
 
@@ -100,6 +128,9 @@ const Login: React.FC<LoginProps> = () => {
                 />
                 <Lock className="absolute left-3 top-3.5 text-slate-400" size={18} />
               </div>
+              {isSignUp && (
+                  <p className="text-xs text-slate-400 mt-1 ml-1">Must be at least 6 characters</p>
+              )}
             </div>
 
             {error && (
@@ -127,28 +158,12 @@ const Login: React.FC<LoginProps> = () => {
               {loading ? (
                   <Loader2 className="animate-spin" size={20} />
               ) : isSignUp ? (
-                  <>Create Account <UserPlus size={18} /></>
+                  <>Create Account</>
               ) : (
-                  <>Sign In <LogIn size={18} /></>
+                  <>Sign In</>
               )}
             </button>
           </form>
-
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-            <p className="text-sm text-slate-600">
-              {isSignUp ? 'Already have an account?' : "Don't have an account?"}
-              <button 
-                onClick={() => { 
-                  setIsSignUp(!isSignUp); 
-                  setError(''); 
-                  setSuccessMsg(''); 
-                }}
-                className="ml-2 font-bold text-blue-600 hover:text-blue-800 transition-colors"
-              >
-                {isSignUp ? 'Sign In' : 'Sign Up'}
-              </button>
-            </p>
-          </div>
         </div>
       </div>
     </div>
