@@ -7,6 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
+      // 1. Polyfill process to prevent "process is not defined" crashes in browser environments
+      window.process = window.process || { env: {} };
+      
       tailwind.config = {
         theme: {
           extend: {
@@ -64,5 +67,7 @@
 </head>
   <body>
     <div id="root"></div>
+    <!-- 2. Add Entry Point Script -->
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
