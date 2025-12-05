@@ -1,48 +1,61 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Helper to safely get env vars from various sources (Vite, React Scripts, or standard process.env)
-const getEnvVar = (key: string) => {
-  // Check standard process.env (Node/CRA)
-  if (typeof process !== 'undefined' && process.env && process.env[key]) {
-    return process.env[key];
-  }
-  // Check Vite specific prefix
-  if (typeof process !== 'undefined' && process.env && process.env[`VITE_${key}`]) {
-    return process.env[`VITE_${key}`];
-  }
-  // Check React App specific prefix
-  if (typeof process !== 'undefined' && process.env && process.env[`REACT_APP_${key}`]) {
-    return process.env[`REACT_APP_${key}`];
-  }
-  // Check import.meta.env (Vite standard) - intentionally using string access to avoid TS errors in non-module context
+// Safe environment variable retriever
+const getEnv = (key: string): string => {
+  // 1. Try Vite standard (import.meta.env)
   try {
     // @ts-ignore
-    if (import.meta && import.meta.env && import.meta.env[`VITE_${key}`]) {
+    if (import.meta?.env) {
       // @ts-ignore
-      return import.meta.env[`VITE_${key}`];
+      const viteVal = import.meta.env[`VITE_${key}`];
+      if (viteVal) return viteVal;
+      // @ts-ignore
+      const plainVal = import.meta.env[key];
+      if (plainVal) return plainVal;
     }
   } catch (e) {
-    // ignore
+    // Ignore errors if import.meta is not available
   }
-  
+
+  // 2. Try global process.env (Standard Node/CRA)
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      const viteVal = process.env[`VITE_${key}`];
+      if (viteVal) return viteVal;
+      
+      const reactVal = process.env[`REACT_APP_${key}`];
+      if (reactVal) return reactVal;
+      
+      const plainVal = process.env[key];
+      if (plainVal) return plainVal;
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+
+  // 3. Fallback to window object if manually injected
+  try {
+    // @ts-ignore
+    if (typeof window !== 'undefined' && window.env) {
+      // @ts-ignore
+      return window.env[key] || '';
+    }
+  } catch (e) {}
+
   return '';
 };
 
-const rawUrl = getEnvVar('SUPABASE_URL');
-const rawKey = getEnvVar('SUPABASE_ANON_KEY');
+const rawUrl = getEnv('SUPABASE_URL');
+const rawKey = getEnv('SUPABASE_ANON_KEY');
 
 const supabaseUrl = rawUrl || 'https://placeholder.supabase.co';
 const supabaseKey = rawKey || 'placeholder';
 
-// Check if the variables are actually present for UI logic
+// Check if configured correctly (must have URL and not be placeholder)
 export const isConfigured = 
   !!rawUrl && 
   !!rawKey && 
   rawUrl.length > 0 && 
   !rawUrl.includes('placeholder');
-
-if (!isConfigured) {
-  console.warn("Supabase is not configured. Environment variables missing.");
-}
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

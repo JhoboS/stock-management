@@ -1,12 +1,30 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, AIAnalysisResult } from '../types';
 
-const getAIClient = () => {
-    // Ensuring API key is present
-    if (!process.env.API_KEY) {
-        throw new Error("API Key is missing.");
+// Duplicate the safe env getter here to avoid circular deps or complex imports
+const getApiKey = (): string => {
+  try {
+    // @ts-ignore
+    if (import.meta?.env?.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+    // @ts-ignore
+    if (import.meta?.env?.API_KEY) return import.meta.env.API_KEY;
+  } catch(e) {}
+
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+        return process.env.VITE_API_KEY || process.env.REACT_APP_API_KEY || process.env.API_KEY || '';
     }
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  } catch(e) {}
+  
+  return '';
+};
+
+const getAIClient = () => {
+    const key = getApiKey();
+    if (!key) {
+        throw new Error("API Key is missing. Please add VITE_API_KEY to environment variables.");
+    }
+    return new GoogleGenAI({ apiKey: key });
 };
 
 export const generateProductDescription = async (name: string, category: string): Promise<string> => {
@@ -19,7 +37,7 @@ export const generateProductDescription = async (name: string, category: string)
         return response.text || "No description generated.";
     } catch (error) {
         console.error("Gemini API Error:", error);
-        return "Error generating description. Please try again.";
+        return "Error generating description (Check API Key).";
     }
 };
 
@@ -75,8 +93,8 @@ export const analyzeInventory = async (products: Product[]): Promise<AIAnalysisR
     } catch (error) {
         console.error("Inventory Analysis Error:", error);
         return {
-            summary: "Unable to analyze inventory at this time.",
-            recommendations: ["Check your network connection", "Verify API Key"],
+            summary: "Unable to analyze inventory. Check if VITE_API_KEY is configured.",
+            recommendations: ["Check Vercel Environment Variables", "Ensure VITE_API_KEY is set"],
             restockPriority: []
         };
     }

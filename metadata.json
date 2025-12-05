@@ -3,8 +3,8 @@
   "description": "Inventory management system for Great River New Energy Service Co. Ltd. Features real-time stock tracking, data visualization, and AI-driven inventory insights.",
   "requestFramePermissions": [],
   "environmentVariables": {
-    "SUPABASE_URL": "The Project URL from Supabase Settings > API",
-    "SUPABASE_ANON_KEY": "The anon public key from Supabase Settings > API",
-    "API_KEY": "Google Gemini API Key"
+    "VITE_SUPABASE_URL": "Your Supabase Project URL",
+    "VITE_SUPABASE_ANON_KEY": "Your Supabase Public Anon Key",
+    "VITE_API_KEY": "Google Gemini API Key"
   }
 }
