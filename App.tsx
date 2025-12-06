@@ -188,7 +188,8 @@ const App: React.FC = () => {
       const refreshed = await fetchProducts();
       setProducts(refreshed);
     } catch (error) {
-      alert("Failed to save product.");
+      console.error(error);
+      alert("Failed to save product. Check console for details.");
       loadData(); // Revert on error
     }
   };
@@ -264,9 +265,10 @@ const App: React.FC = () => {
          setStockLogs([log, ...stockLogs]);
          await addStockLogApi(log);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Operation failed. Syncing data...");
+      // Show specific error message from DB if available
+      alert(`Operation failed: ${error.message || "Unknown error"}. Check if tables exist in Settings > Database Schema.`);
       loadData();
     }
   };

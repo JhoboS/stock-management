@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { X, Sparkles, Loader2 } from 'lucide-react';
@@ -64,7 +65,8 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
     if (!formData.name || !formData.nameZh || !formData.sku) return;
     
     const newProduct: Product = {
-      id: product?.id || Date.now().toString(),
+      // Use crypto.randomUUID() for DB compatibility (vs legacy Date.now string)
+      id: product?.id || crypto.randomUUID(),
       name: formData.name!,
       nameZh: formData.nameZh!,
       sku: formData.sku!,

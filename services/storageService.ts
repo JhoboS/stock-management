@@ -6,11 +6,37 @@ import { Product, Assignment, ScrappedItem, Employee, AppUser, StockLog } from '
 export const fetchProducts = async (): Promise<Product[]> => {
   const { data, error } = await supabase.from('products').select('*');
   if (error) throw error;
-  return data || [];
+  
+  return (data || []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    nameZh: p.name_zh || p.nameZh || '', 
+    sku: p.sku,
+    category: p.category,
+    quantity: p.quantity,
+    price: p.price,
+    minStock: p.min_stock !== undefined ? p.min_stock : (p.minStock || 0),
+    description: p.description,
+    lastUpdated: p.last_updated || p.lastUpdated || p.created_at || new Date().toISOString()
+  }));
 };
 
 export const upsertProduct = async (product: Product): Promise<void> => {
-  const { error } = await supabase.from('products').upsert(product);
+  // Map to snake_case for DB
+  const dbRecord = {
+    id: product.id,
+    name: product.name,
+    name_zh: product.nameZh,
+    sku: product.sku,
+    category: product.category,
+    quantity: product.quantity,
+    price: product.price,
+    min_stock: product.minStock,
+    description: product.description,
+    last_updated: product.lastUpdated
+  };
+
+  const { error } = await supabase.from('products').upsert(dbRecord);
   if (error) throw error;
 };
 
@@ -23,11 +49,28 @@ export const deleteProductApi = async (id: string): Promise<void> => {
 export const fetchEmployees = async (): Promise<Employee[]> => {
   const { data, error } = await supabase.from('employees').select('*');
   if (error) throw error;
-  return data || [];
+  
+  return (data || []).map((e: any) => ({
+    id: e.id,
+    name: e.name,
+    email: e.email,
+    department: e.department,
+    role: e.role,
+    joinedDate: e.joined_date || e.joinedDate || e.created_at
+  }));
 };
 
 export const addEmployeeApi = async (employee: Employee): Promise<void> => {
-  const { error } = await supabase.from('employees').insert(employee);
+  const dbRecord = {
+    id: employee.id,
+    name: employee.name,
+    email: employee.email,
+    department: employee.department,
+    role: employee.role,
+    joined_date: employee.joinedDate
+  };
+
+  const { error } = await supabase.from('employees').insert(dbRecord);
   if (error) throw error;
 };
 
@@ -36,12 +79,11 @@ export const fetchAssignments = async (): Promise<Assignment[]> => {
   const { data, error } = await supabase.from('assignments').select('*');
   if (error) throw error;
   
-  // Map DB (potential snake_case) to App (camelCase)
   return (data || []).map((item: any) => ({
     id: item.id,
     productId: item.product_id || item.productId,
     productName: item.product_name || item.productName,
-    productNameZh: item.product_name_zh || item.productNameZh,
+    productNameZh: item.product_name_zh || item.productNameZh || '',
     employeeId: item.employee_id || item.employeeId,
     employeeName: item.employee_name || item.employeeName,
     quantity: item.quantity,
@@ -52,7 +94,6 @@ export const fetchAssignments = async (): Promise<Assignment[]> => {
 };
 
 export const addAssignmentApi = async (assignment: Assignment): Promise<void> => {
-  // Map App (camelCase) to DB (snake_case)
   const dbRecord = {
     id: assignment.id,
     product_id: assignment.productId,
@@ -72,7 +113,6 @@ export const addAssignmentApi = async (assignment: Assignment): Promise<void> =>
 
 // Scrapped Items
 export const fetchScrappedItems = async (): Promise<ScrappedItem[]> => {
-  // Order might fail if column doesn't exist, so we sort in JS
   const { data, error } = await supabase.from('scrapped_items').select('*');
   if (error) throw error;
   
@@ -80,19 +120,17 @@ export const fetchScrappedItems = async (): Promise<ScrappedItem[]> => {
     id: item.id,
     productId: item.product_id || item.productId,
     productName: item.product_name || item.productName,
-    productNameZh: item.product_name_zh || item.productNameZh,
+    productNameZh: item.product_name_zh || item.productNameZh || '',
     quantity: item.quantity,
     reason: item.reason,
     scrappedDate: item.scrapped_date || item.scrappedDate || item.created_at,
     performedBy: item.performed_by || item.performedBy
   }));
 
-  // Sort by date desc
   return items.sort((a, b) => new Date(b.scrappedDate).getTime() - new Date(a.scrappedDate).getTime());
 };
 
 export const addScrappedItemApi = async (item: ScrappedItem): Promise<void> => {
-  // Map App (camelCase) to DB (snake_case)
   const dbRecord = {
     id: item.id,
     product_id: item.productId,
@@ -125,7 +163,7 @@ export const deleteCategoryApi = async (name: string): Promise<void> => {
   if (error) throw error;
 };
 
-// --- NEW: Stock Logs (Inbound/History) ---
+// Stock Logs
 export const fetchStockLogs = async (): Promise<StockLog[]> => {
   const { data, error } = await supabase.from('stock_logs').select('*');
   
@@ -161,7 +199,7 @@ export const addStockLogApi = async (log: StockLog): Promise<void> => {
   if (error) console.error("Failed to add stock log:", error);
 };
 
-// --- NEW: User Management ---
+// User Management
 export const fetchAppUser = async (email: string): Promise<AppUser | null> => {
   const { data, error } = await supabase.from('app_users').select('*').eq('email', email).single();
   if (error) return null;
