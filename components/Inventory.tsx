@@ -90,12 +90,12 @@ const Inventory: React.FC<InventoryProps> = ({
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                <th className="px-6 py-4">Product Info</th>
-                <th className="px-6 py-4 text-center">Inbound (Total)</th>
-                <th className="px-6 py-4 text-center">Assigned (Active)</th>
-                <th className="px-6 py-4 text-center">Scrapped (Total)</th>
-                <th className="px-6 py-4 text-center">Stock</th>
-                <th className="px-6 py-4 text-center">Actions</th>
+                <th className="px-6 py-3">Product Info</th>
+                <th className="px-6 py-3 text-center">Inbound (Total)</th>
+                <th className="px-6 py-3 text-center">Assigned (Active)</th>
+                <th className="px-6 py-3 text-center">Scrapped (Total)</th>
+                <th className="px-6 py-3 text-center">Stock</th>
+                <th className="px-6 py-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -118,7 +118,7 @@ const Inventory: React.FC<InventoryProps> = ({
 
                   return (
                     <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3">
                         <div className="font-medium text-slate-900">{product.name}</div>
                         <div className="text-sm text-slate-500">{product.nameZh}</div>
                         <div className="flex items-center gap-2 mt-1">
@@ -130,17 +130,17 @@ const Inventory: React.FC<InventoryProps> = ({
                       </td>
                       
                       {/* Stats Columns */}
-                      <td className="px-6 py-4 text-center text-sm font-medium text-green-600">
+                      <td className="px-6 py-3 text-center text-sm font-medium text-green-600">
                         {totalInbound > 0 ? totalInbound : '-'}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm font-medium text-blue-600">
+                      <td className="px-6 py-3 text-center text-sm font-medium text-blue-600">
                         {activeAssigned > 0 ? activeAssigned : '-'}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm font-medium text-red-500">
+                      <td className="px-6 py-3 text-center text-sm font-medium text-red-500">
                         {totalScrapped > 0 ? totalScrapped : '-'}
                       </td>
 
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-3 text-center">
                          <div className="flex flex-col items-center">
                             <span className="font-mono font-bold text-slate-800 text-lg">{product.quantity}</span>
                             {isLowStock ? (
@@ -153,7 +153,7 @@ const Inventory: React.FC<InventoryProps> = ({
                          </div>
                       </td>
 
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <button 
                             onClick={() => onAssign(product)}
