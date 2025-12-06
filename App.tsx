@@ -187,9 +187,14 @@ const App: React.FC = () => {
       // Reload to ensure sync
       const refreshed = await fetchProducts();
       setProducts(refreshed);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to save product. Check console for details.");
+      const msg = error.message || "Unknown error";
+      if (msg.includes('column') || msg.includes('relation')) {
+          alert("DATABASE SCHEMA ERROR: Missing columns. \n\nPlease go to Settings > View Database Schema, copy the SQL, and run it in Supabase SQL Editor to fix your tables.");
+      } else {
+          alert(`Failed to save product: ${msg}`);
+      }
       loadData(); // Revert on error
     }
   };
@@ -267,8 +272,12 @@ const App: React.FC = () => {
       }
     } catch (error: any) {
       console.error(error);
-      // Show specific error message from DB if available
-      alert(`Operation failed: ${error.message || "Unknown error"}. Check if tables exist in Settings > Database Schema.`);
+      const msg = error.message || "Unknown error";
+      if (msg.includes('column') || msg.includes('relation')) {
+          alert("DATABASE SCHEMA ERROR: Missing columns. \n\nPlease go to Settings > View Database Schema, copy the SQL, and run it in Supabase SQL Editor to fix your tables.");
+      } else {
+          alert(`Operation failed: ${msg}`);
+      }
       loadData();
     }
   };
