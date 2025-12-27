@@ -84,6 +84,7 @@ const Inventory: React.FC<InventoryProps> = ({
       <div className="grid grid-cols-1 gap-4 md:hidden">
         {filteredProducts.map((product) => {
           const isLowStock = product.quantity <= product.minStock;
+          const totalVal = product.quantity * product.price;
           return (
             <div key={product.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex flex-col gap-4">
                <div className="flex justify-between items-start">
@@ -98,6 +99,7 @@ const Inventory: React.FC<InventoryProps> = ({
                   <div className="text-right">
                     <p className={`text-2xl font-black ${isLowStock ? 'text-red-500' : 'text-slate-900'}`}>{product.quantity}</p>
                     <p className="text-[9px] font-black uppercase text-slate-400 tracking-tighter">Units Left</p>
+                    <p className="text-[10px] font-black text-emerald-600 mt-1">${totalVal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                   </div>
                </div>
                
@@ -124,10 +126,11 @@ const Inventory: React.FC<InventoryProps> = ({
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-400">
                 <th className="px-8 py-4">Asset Identification</th>
-                <th className="px-6 py-4 text-center">Inbound Hist.</th>
-                <th className="px-6 py-4 text-center">Active Usage</th>
-                <th className="px-6 py-4 text-center">Scrap Count</th>
-                <th className="px-8 py-4 text-center">Available Stock</th>
+                <th className="px-4 py-4 text-center">Inbound Hist.</th>
+                <th className="px-4 py-4 text-center">Active Usage</th>
+                <th className="px-4 py-4 text-center">Scrap Count</th>
+                <th className="px-6 py-4 text-center">Available Stock</th>
+                <th className="px-6 py-4 text-center">Total Value</th>
                 <th className="px-8 py-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -135,6 +138,7 @@ const Inventory: React.FC<InventoryProps> = ({
               {filteredProducts.length > 0 ? (
                 filteredProducts.map((product) => {
                   const isLowStock = product.quantity <= product.minStock;
+                  const totalValue = product.quantity * product.price;
                   
                   const totalInbound = logs
                       .filter(l => (l.productName === product.name) && (l.action === 'INBOUND' || l.action === 'CREATE'))
@@ -163,17 +167,17 @@ const Inventory: React.FC<InventoryProps> = ({
                         </div>
                       </td>
                       
-                      <td className="px-6 py-5 text-center text-sm font-black text-emerald-600">
+                      <td className="px-4 py-5 text-center text-sm font-black text-emerald-600">
                         {totalInbound > 0 ? `+${totalInbound}` : '-'}
                       </td>
-                      <td className="px-6 py-5 text-center text-sm font-black text-blue-600">
+                      <td className="px-4 py-5 text-center text-sm font-black text-blue-600">
                         {activeAssigned > 0 ? activeAssigned : '-'}
                       </td>
-                      <td className="px-6 py-5 text-center text-sm font-black text-red-400">
+                      <td className="px-4 py-5 text-center text-sm font-black text-red-400">
                         {totalScrapped > 0 ? totalScrapped : '-'}
                       </td>
 
-                      <td className="px-8 py-5 text-center">
+                      <td className="px-6 py-5 text-center">
                          <div className="flex flex-col items-center">
                             <span className={`font-mono font-black text-sm ${isLowStock ? 'text-red-500' : 'text-slate-900'}`}>{product.quantity}</span>
                             {isLowStock && (
@@ -182,6 +186,10 @@ const Inventory: React.FC<InventoryProps> = ({
                                 </span>
                             )}
                          </div>
+                      </td>
+
+                      <td className="px-6 py-5 text-center text-sm font-black text-slate-900">
+                        ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
 
                       <td className="px-8 py-5 text-right">
@@ -202,7 +210,7 @@ const Inventory: React.FC<InventoryProps> = ({
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center text-slate-500">
+                  <td colSpan={7} className="px-8 py-20 text-center text-slate-500">
                     <div className="flex flex-col items-center gap-4">
                       <Package size={64} className="text-slate-100" strokeWidth={1} />
                       <p className="font-black uppercase text-xs tracking-widest text-slate-300">Warehouse inventory is empty</p>
