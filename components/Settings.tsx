@@ -106,10 +106,10 @@ const Settings: React.FC<SettingsProps> = ({
     } catch (err: any) { setPasswordMsg({ type: 'error', text: err.message }); }
   };
 
-  const sqlSchema = `-- REPAIR TERMINAL: REGIONAL INDEPENDENCE & RLS SECURITY (V3)
--- This script secures your data and allows regional independence.
+  const sqlSchema = `-- REPAIR TERMINAL: FULL RLS COMPATIBILITY (V4)
+-- This script ensures the system operates normally with RLS ENABLED.
 
--- 1. TABLES INITIALIZATION
+-- 1. CORE TABLES
 create table if not exists warehouses (
   id uuid primary key default gen_random_uuid(), 
   name text not null, 
@@ -117,34 +117,28 @@ create table if not exists warehouses (
   created_at timestamptz default now()
 );
 
+create table if not exists app_users (
+  id uuid primary key references auth.users(id),
+  email text unique not null,
+  is_approved boolean default false,
+  role text default 'user',
+  assigned_warehouses uuid[] default '{}',
+  created_at timestamptz default now()
+);
+
+-- 2. SEED DEFAULT DATA
 insert into warehouses (id, name, location)
 select '00000000-0000-0000-0000-000000000000', 'US Warehouse', 'United States'
 where not exists (select 1 from warehouses where id = '00000000-0000-0000-0000-000000000000');
 
--- 2. REGIONAL INDEPENDENCE FIXES (CATEGORIES & PRODUCTS)
-alter table categories drop constraint if exists categories_name_key;
-alter table categories drop constraint if exists categories_name_unique;
+-- 3. REGIONAL CONSTRAINTS
 alter table categories add column if not exists warehouse_id uuid references warehouses(id);
 update categories set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
 
-do $$ begin 
-  if not exists (select 1 from pg_constraint where conname = 'categories_name_warehouse_unique') then
-    alter table categories add constraint categories_name_warehouse_unique unique (name, warehouse_id);
-  end if;
-end $$;
-
-alter table products drop constraint if exists products_sku_key;
-alter table products drop constraint if exists products_name_key;
 alter table products add column if not exists warehouse_id uuid references warehouses(id);
 update products set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
 
-do $$ begin 
-  if not exists (select 1 from pg_constraint where conname = 'products_sku_warehouse_unique') then
-    alter table products add constraint products_sku_warehouse_unique unique (sku, warehouse_id);
-  end if;
-end $$;
-
--- 3. ENABLE ROW LEVEL SECURITY (RLS)
+-- 4. ENABLE ROW LEVEL SECURITY
 alter table warehouses enable row level security;
 alter table products enable row level security;
 alter table categories enable row level security;
@@ -154,65 +148,73 @@ alter table scrapped_items enable row level security;
 alter table stock_logs enable row level security;
 alter table app_users enable row level security;
 
--- 4. CREATE SECURITY POLICIES
--- NOTE: 'auth.jwt()->>''email''' gets the current logged-in user email.
+-- 5. DEFINE SECURITY POLICIES
 
--- General Rule: Super Admin (jhobo@grnesl.com) has full access to everything
+-- Helper for Super Admin identification
 create or replace function is_super_admin() returns boolean as $$
   begin
     return (select auth.jwt()->>'email' = 'jhobo@grnesl.com');
   end;
 $$ language plpgsql security definer;
 
--- Policy for APP_USERS: Everyone can read their own, Super Admin can see all
-drop policy if exists "Users can view their own profile" on app_users;
-create policy "Users can view their own profile" on app_users for select
+-- APP_USERS Policies
+drop policy if exists "Users can read own profile" on app_users;
+create policy "Users can read own profile" on app_users for select
 using (auth.uid() = id or is_super_admin());
 
-drop policy if exists "Super Admins can update users" on app_users;
-create policy "Super Admins can update users" on app_users for all
+drop policy if exists "Super admin full control" on app_users;
+create policy "Super admin full control" on app_users for all
 using (is_super_admin());
 
--- Regional Policies: Access limited by assigned_warehouses array
-drop policy if exists "Users can access regional data" on products;
-create policy "Users can access regional data" on products for all
+-- REGIONAL DATA Policies (Products, Categories, Logs, etc.)
+-- These check if the warehouse_id of the row is inside the user's assigned_warehouses array.
+
+-- Products
+drop policy if exists "Regional product access" on products;
+create policy "Regional product access" on products for all
 using (
   is_super_admin() or 
   warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid())
 );
 
-drop policy if exists "Users can access regional categories" on categories;
-create policy "Users can access regional categories" on categories for all
+-- Categories
+drop policy if exists "Regional category access" on categories;
+create policy "Regional category access" on categories for all
 using (
   is_super_admin() or 
   warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid())
 );
 
-drop policy if exists "Users can access regional warehouses" on warehouses;
-create policy "Users can access regional warehouses" on warehouses for select
+-- Warehouses
+drop policy if exists "Warehouse visibility" on warehouses;
+create policy "Warehouse visibility" on warehouses for select
 using (
   is_super_admin() or 
   id = any (select assigned_warehouses from app_users where id = auth.uid())
 );
 
--- Apply same logic to logs, employees, assignments, scrapped_items
-drop policy if exists "Users can access regional logs" on stock_logs;
-create policy "Users can access regional logs" on stock_logs for all
+-- Logs
+drop policy if exists "Regional log access" on stock_logs;
+create policy "Regional log access" on stock_logs for all
+using (
+  is_super_admin() or 
+  warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid())
+);
+
+-- Assignments, Employees, Scrapped Items (Same Logic)
+drop policy if exists "Regional assignment access" on assignments;
+create policy "Regional assignment access" on assignments for all
 using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
-drop policy if exists "Users can access regional employees" on employees;
-create policy "Users can access regional employees" on employees for all
+drop policy if exists "Regional employee access" on employees;
+create policy "Regional employee access" on employees for all
 using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
-drop policy if exists "Users can access regional assignments" on assignments;
-create policy "Users can access regional assignments" on assignments for all
+drop policy if exists "Regional scrap access" on scrapped_items;
+create policy "Regional scrap access" on scrapped_items for all
 using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
-drop policy if exists "Users can access regional scrapped" on scrapped_items;
-create policy "Users can access regional scrapped" on scrapped_items for all
-using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
-
--- 5. RELOAD
+-- 6. REFRESH
 NOTIFY pgrst, 'reload config';
 `;
 
@@ -246,7 +248,7 @@ NOTIFY pgrst, 'reload config';
               <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Tag className="text-blue-600" size={24} /> Categories</h3>
               {isSuperAdmin && (
                 <button onClick={() => setShowSchema(true)} className="flex items-center gap-2 text-[10px] font-black uppercase text-white bg-blue-600 px-4 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-                  <Database size={14} /> System SQL Repair (V3)
+                  <Database size={14} /> System SQL Repair (V4)
                 </button>
               )}
             </div>
@@ -371,8 +373,8 @@ NOTIFY pgrst, 'reload config';
             <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div>
-                        <h3 className="text-2xl font-black text-slate-900">Database Repair Terminal (V3)</h3>
-                        <p className="text-xs text-slate-500 mt-1 font-medium">Initializes regional hubs, fixes constraints, and enables secure RLS policies.</p>
+                        <h3 className="text-2xl font-black text-slate-900">Database Repair Terminal (V4)</h3>
+                        <p className="text-xs text-slate-500 mt-1 font-medium">Initializes core tables and robust RLS policies for complete regional security.</p>
                     </div>
                     <button onClick={() => setShowSchema(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={24} /></button>
                 </div>
