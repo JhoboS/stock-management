@@ -23,14 +23,14 @@ export const fetchProducts = async (warehouseId: string): Promise<Product[]> => 
   return (data || []).map((p: any) => ({
     id: p.id,
     warehouseId: p.warehouse_id,
-    name: p.name,
+    name: p.name || 'Unnamed Asset',
     nameZh: p.name_zh || '', 
-    sku: p.sku,
-    category: p.category,
-    quantity: p.quantity,
-    price: p.price,
+    sku: p.sku || 'N/A',
+    category: p.category || 'Uncategorized',
+    quantity: p.quantity || 0,
+    price: p.price || 0,
     minStock: p.min_stock || 0,
-    description: p.description,
+    description: p.description || '',
     lastUpdated: p.last_updated || new Date().toISOString()
   }));
 };
@@ -62,11 +62,11 @@ export const fetchEmployees = async (warehouseId: string): Promise<Employee[]> =
   return (data || []).map((e: any) => ({
     id: e.id,
     warehouseId: e.warehouse_id,
-    name: e.name,
-    email: e.email,
-    department: e.department,
-    role: e.role,
-    joinedDate: e.joined_date || e.created_at
+    name: e.name || 'Unknown Staff',
+    email: e.email || '',
+    department: e.department || 'General',
+    role: e.role || 'Staff',
+    joinedDate: e.joined_date || e.created_at || new Date().toISOString()
   }));
 };
 
@@ -93,14 +93,14 @@ export const fetchAssignments = async (warehouseId: string): Promise<Assignment[
     id: item.id,
     warehouseId: item.warehouse_id,
     productId: item.product_id,
-    productName: item.product_name,
+    productName: item.product_name || 'Deleted Product',
     productNameZh: item.product_name_zh || '',
     employeeId: item.employee_id,
-    employeeName: item.employee_name,
-    quantity: item.quantity,
-    assignedDate: item.assigned_date || item.created_at,
-    status: item.status,
-    performedBy: item.performed_by
+    employeeName: item.employee_name || 'Unknown Employee',
+    quantity: item.quantity || 0,
+    assignedDate: item.assigned_date || item.created_at || new Date().toISOString(),
+    status: item.status || 'Active',
+    performedBy: item.performed_by || 'System'
   }));
 };
 
@@ -130,12 +130,12 @@ export const fetchScrappedItems = async (warehouseId: string): Promise<ScrappedI
     id: item.id,
     warehouseId: item.warehouse_id,
     productId: item.product_id,
-    productName: item.product_name,
+    productName: item.product_name || 'Deleted Product',
     productNameZh: item.product_name_zh || '',
-    quantity: item.quantity,
-    reason: item.reason,
-    scrappedDate: item.scrapped_date || item.created_at,
-    performedBy: item.performed_by
+    quantity: item.quantity || 0,
+    reason: item.reason || 'No reason provided',
+    scrappedDate: item.scrapped_date || item.created_at || new Date().toISOString(),
+    performedBy: item.performed_by || 'System'
   }));
 };
 
@@ -144,6 +144,7 @@ export const addScrappedItemApi = async (item: ScrappedItem): Promise<void> => {
     id: item.id,
     warehouse_id: item.warehouseId,
     product_id: item.productId,
+    // Fix: access item properties using camelCase as defined in types.ts
     product_name: item.productName,
     product_name_zh: item.productNameZh,
     quantity: item.quantity,
@@ -174,18 +175,32 @@ export const deleteCategoryApi = async (name: string, warehouseId: string): Prom
 
 // Stock Logs
 export const fetchStockLogs = async (warehouseId: string): Promise<StockLog[]> => {
-  const { data, error } = await supabase.from('stock_logs').select('*').eq('warehouse_id', warehouseId).order('date', { ascending: false });
-  if (error) return [];
-  return (data || []).map((item: any) => ({
-    id: item.id,
-    warehouseId: item.warehouse_id,
-    action: item.action,
-    productName: item.product_name,
-    quantity: item.quantity,
-    performedBy: item.performed_by,
-    date: item.date || item.created_at,
-    details: item.details
-  }));
+  try {
+    const { data, error } = await supabase
+      .from('stock_logs')
+      .select('*')
+      .eq('warehouse_id', warehouseId)
+      .order('date', { ascending: false });
+      
+    if (error) {
+      console.error("Supabase error fetching logs:", error);
+      return [];
+    }
+    
+    return (data || []).map((item: any) => ({
+      id: item.id,
+      warehouseId: item.warehouse_id,
+      action: item.action || 'UPDATE',
+      productName: item.product_name || 'Unknown Item',
+      quantity: item.quantity || 0,
+      performedBy: item.performed_by || 'System User',
+      date: item.date || item.created_at || new Date().toISOString(),
+      details: item.details || ''
+    }));
+  } catch (err) {
+    console.error("Failed to map stock logs:", err);
+    return [];
+  }
 };
 
 export const addStockLogApi = async (log: StockLog): Promise<void> => {

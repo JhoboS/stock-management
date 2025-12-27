@@ -106,10 +106,10 @@ const Settings: React.FC<SettingsProps> = ({
     } catch (err: any) { setPasswordMsg({ type: 'error', text: err.message }); }
   };
 
-  const sqlSchema = `-- REPAIR TERMINAL: FULL RLS COMPATIBILITY (V4.2)
--- Fixes 'uuid = uuid[]' error by using unnest() for scalar comparison.
+  const sqlSchema = `-- REPAIR TERMINAL: FULL DATABASE GENERATION (V4.3)
+-- Run this to fix "Failed to fetch" errors and missing tables.
 
--- 1. CORE TABLES SETUP
+-- 1. CORE ARCHITECTURE
 create table if not exists warehouses (
   id uuid primary key default gen_random_uuid(), 
   name text not null, 
@@ -126,96 +126,112 @@ create table if not exists app_users (
   created_at timestamptz default now()
 );
 
--- 2. SEED DEFAULT GLOBAL WAREHOUSE
-insert into warehouses (id, name, location)
-select '00000000-0000-0000-0000-000000000000', 'US Warehouse', 'United States'
-where not exists (select 1 from warehouses where id = '00000000-0000-0000-0000-000000000000');
+-- 2. INVENTORY & TAXONOMY
+create table if not exists categories (
+  id uuid primary key default gen_random_uuid(),
+  warehouse_id uuid references warehouses(id),
+  name text not null,
+  created_at timestamptz default now()
+);
 
--- 3. REGIONAL CONSTRAINTS REPAIR
-alter table categories drop constraint if exists categories_name_key;
-alter table categories add column if not exists warehouse_id uuid references warehouses(id);
-update categories set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
+create table if not exists products (
+  id uuid primary key default gen_random_uuid(),
+  warehouse_id uuid references warehouses(id),
+  name text not null,
+  name_zh text,
+  sku text,
+  category text,
+  quantity integer default 0,
+  price numeric default 0,
+  min_stock integer default 5,
+  description text,
+  last_updated timestamptz default now(),
+  created_at timestamptz default now()
+);
 
-alter table products drop constraint if exists products_sku_key;
-alter table products add column if not exists warehouse_id uuid references warehouses(id);
-update products set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
+-- 3. STAFF & TRANSACTIONS
+create table if not exists employees (
+  id uuid primary key default gen_random_uuid(),
+  warehouse_id uuid references warehouses(id),
+  name text not null,
+  email text,
+  department text,
+  role text,
+  joined_date timestamptz default now(),
+  created_at timestamptz default now()
+);
 
--- 4. ENABLE ROW LEVEL SECURITY
+create table if not exists assignments (
+  id uuid primary key default gen_random_uuid(),
+  warehouse_id uuid references warehouses(id),
+  product_id uuid references products(id),
+  product_name text,
+  product_name_zh text,
+  employee_id uuid references employees(id),
+  employee_name text,
+  quantity integer default 1,
+  assigned_date timestamptz default now(),
+  status text default 'Active',
+  performed_by text,
+  created_at timestamptz default now()
+);
+
+create table if not exists scrapped_items (
+  id uuid primary key default gen_random_uuid(),
+  warehouse_id uuid references warehouses(id),
+  product_id uuid references products(id),
+  product_name text,
+  product_name_zh text,
+  quantity integer default 1,
+  reason text,
+  scrapped_date timestamptz default now(),
+  performed_by text,
+  created_at timestamptz default now()
+);
+
+create table if not exists stock_logs (
+  id uuid primary key default gen_random_uuid(),
+  warehouse_id uuid references warehouses(id),
+  action text not null,
+  product_name text not null,
+  quantity integer not null,
+  performed_by text not null,
+  date timestamptz default now(),
+  details text,
+  created_at timestamptz default now()
+);
+
+-- 4. SECURITY & PERMISSIONS
 alter table warehouses enable row level security;
-alter table products enable row level security;
+alter table app_users enable row level security;
 alter table categories enable row level security;
+alter table products enable row level security;
 alter table employees enable row level security;
 alter table assignments enable row level security;
 alter table scrapped_items enable row level security;
 alter table stock_logs enable row level security;
-alter table app_users enable row level security;
 
--- 5. DEFINE SECURITY POLICIES
-
--- Master Identity Helper
+-- Identity Helper
 create or replace function is_super_admin() returns boolean as $$
   begin
     return (select auth.jwt()->>'email' = 'jhobo@grnesl.com');
   end;
 $$ language plpgsql security definer;
 
--- APP_USERS POLICIES
-drop policy if exists "Users can read own profile" on app_users;
-create policy "Users can read own profile" on app_users for select
-using (auth.uid() = id or is_super_admin());
-
-drop policy if exists "Allow initial registration" on app_users;
-create policy "Allow initial registration" on app_users for insert
-with check (auth.uid() = id);
-
-drop policy if exists "Super admin full user control" on app_users;
-create policy "Super admin full user control" on app_users for all
-using (is_super_admin());
-
--- REGIONAL DATA POLICIES (Using IN unnest() to avoid uuid = uuid[] error)
-
--- Products
-drop policy if exists "Regional product access" on products;
-create policy "Regional product access" on products for all
-using (
-  is_super_admin() or 
-  warehouse_id in (select unnest(assigned_warehouses) from app_users where id = auth.uid())
-);
-
--- Categories
-drop policy if exists "Regional category access" on categories;
-create policy "Regional category access" on categories for all
-using (
-  is_super_admin() or 
-  warehouse_id in (select unnest(assigned_warehouses) from app_users where id = auth.uid())
-);
-
--- Warehouses
-drop policy if exists "Warehouse visibility" on warehouses;
-create policy "Warehouse visibility" on warehouses for select
-using (
-  is_super_admin() or 
-  id in (select unnest(assigned_warehouses) from app_users where id = auth.uid())
-);
-
--- Shared regional logic for Logs, Employees, Assignments, and Scrap
+-- REGIONAL RLS POLICIES (Using unnest for array comparison)
 drop policy if exists "Regional log access" on stock_logs;
 create policy "Regional log access" on stock_logs for all
 using (is_super_admin() or warehouse_id in (select unnest(assigned_warehouses) from app_users where id = auth.uid()));
 
-drop policy if exists "Regional employee access" on employees;
-create policy "Regional employee access" on employees for all
+drop policy if exists "Regional product access" on products;
+create policy "Regional product access" on products for all
 using (is_super_admin() or warehouse_id in (select unnest(assigned_warehouses) from app_users where id = auth.uid()));
 
-drop policy if exists "Regional assignment access" on assignments;
-create policy "Regional assignment access" on assignments for all
-using (is_super_admin() or warehouse_id in (select unnest(assigned_warehouses) from app_users where id = auth.uid()));
+-- SEED DATA
+insert into warehouses (id, name, location)
+select '00000000-0000-0000-0000-000000000000', 'US Warehouse', 'United States'
+where not exists (select 1 from warehouses where id = '00000000-0000-0000-0000-000000000000');
 
-drop policy if exists "Regional scrap access" on scrapped_items;
-create policy "Regional scrap access" on scrapped_items for all
-using (is_super_admin() or warehouse_id in (select unnest(assigned_warehouses) from app_users where id = auth.uid()));
-
--- 6. FORCE REFRESH
 NOTIFY pgrst, 'reload config';
 `;
 
@@ -252,7 +268,7 @@ NOTIFY pgrst, 'reload config';
               </div>
               {isSuperAdmin && (
                 <button onClick={() => setShowSchema(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 text-[10px] font-black uppercase text-white bg-blue-600 px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-                  <Database size={14} /> System SQL Repair (V4.2)
+                  <Database size={14} /> System SQL Repair (V4.3)
                 </button>
               )}
             </div>
@@ -393,22 +409,21 @@ NOTIFY pgrst, 'reload config';
       {showSchema && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in p-4">
             <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
-                <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <div>
-                        <h3 className="text-2xl font-black text-slate-900">Database Repair (V4.2)</h3>
-                        <p className="text-xs text-slate-500 mt-1 font-medium italic">Advanced scalar unnesting for robust RLS.</p>
-                    </div>
-                    <button onClick={() => setShowSchema(false)} className="p-2.5 hover:bg-slate-200 rounded-full transition-colors text-slate-400"><X size={24} /></button>
+                <div className="p-8 border-b border-slate-100 flex justify-between items-center">
+                  <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Database size={24} className="text-blue-600" /> System SQL Repair
+                  </h2>
+                  <button onClick={() => setShowSchema(false)} className="text-slate-400 hover:text-slate-600">
+                    <X size={24} />
+                  </button>
                 </div>
-                <div className="p-0 flex-1 bg-slate-900 overflow-auto">
-                    <pre className="p-8 text-xs text-blue-300 font-mono leading-relaxed">{sqlSchema}</pre>
+                <div className="p-8 overflow-y-auto bg-slate-50 font-mono text-[10px] whitespace-pre-wrap flex-1">
+                  {sqlSchema}
                 </div>
-                <div className="p-6 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200">
-                     <p className="text-[10px] font-bold text-slate-400 max-w-xs text-center sm:text-left">Copy and execute this script in the Supabase SQL Editor to secure the database.</p>
-                     <div className="flex gap-3 w-full sm:w-auto">
-                        <button onClick={() => { navigator.clipboard.writeText(sqlSchema); alert("SQL Migration script copied to clipboard!"); }} className="flex-1 sm:flex-none px-8 py-3.5 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all">Copy SQL</button>
-                        <button onClick={() => setShowSchema(false)} className="flex-1 sm:flex-none px-8 py-3.5 bg-white text-slate-700 border border-slate-200 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50">Dismiss</button>
-                     </div>
+                <div className="p-6 border-t border-slate-100 flex justify-end">
+                  <button onClick={() => setShowSchema(false)} className="bg-slate-900 text-white px-6 py-2 rounded-xl font-bold text-xs uppercase tracking-widest">
+                    Close
+                  </button>
                 </div>
             </div>
         </div>
