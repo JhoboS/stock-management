@@ -106,10 +106,11 @@ const Settings: React.FC<SettingsProps> = ({
     } catch (err: any) { setPasswordMsg({ type: 'error', text: err.message }); }
   };
 
-  const sqlSchema = `-- REPAIR TERMINAL: FULL RLS COMPATIBILITY (V4)
--- This script ensures the system operates normally with RLS ENABLED.
+  const sqlSchema = `-- REPAIR TERMINAL: FULL RLS COMPATIBILITY (V4.1)
+-- This script safely configures your database for Regional Row Level Security.
+-- Note: 'Destructive' warnings in Supabase are normal here as we replace old constraints/policies.
 
--- 1. CORE TABLES
+-- 1. CORE TABLES SETUP
 create table if not exists warehouses (
   id uuid primary key default gen_random_uuid(), 
   name text not null, 
@@ -126,19 +127,22 @@ create table if not exists app_users (
   created_at timestamptz default now()
 );
 
--- 2. SEED DEFAULT DATA
+-- 2. SEED DEFAULT GLOBAL WAREHOUSE
 insert into warehouses (id, name, location)
 select '00000000-0000-0000-0000-000000000000', 'US Warehouse', 'United States'
 where not exists (select 1 from warehouses where id = '00000000-0000-0000-0000-000000000000');
 
--- 3. REGIONAL CONSTRAINTS
+-- 3. REGIONAL CONSTRAINTS REPAIR
+-- We drop old global unique constraints to allow same names in different regions.
+alter table categories drop constraint if exists categories_name_key;
 alter table categories add column if not exists warehouse_id uuid references warehouses(id);
 update categories set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
 
+alter table products drop constraint if exists products_sku_key;
 alter table products add column if not exists warehouse_id uuid references warehouses(id);
 update products set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
 
--- 4. ENABLE ROW LEVEL SECURITY
+-- 4. ENABLE ROW LEVEL SECURITY (RLS)
 alter table warehouses enable row level security;
 alter table products enable row level security;
 alter table categories enable row level security;
@@ -150,71 +154,62 @@ alter table app_users enable row level security;
 
 -- 5. DEFINE SECURITY POLICIES
 
--- Helper for Super Admin identification
+-- Master Identity Helper
 create or replace function is_super_admin() returns boolean as $$
   begin
     return (select auth.jwt()->>'email' = 'jhobo@grnesl.com');
   end;
 $$ language plpgsql security definer;
 
--- APP_USERS Policies
+-- APP_USERS POLICIES (Critical for first-time login)
 drop policy if exists "Users can read own profile" on app_users;
 create policy "Users can read own profile" on app_users for select
 using (auth.uid() = id or is_super_admin());
 
-drop policy if exists "Super admin full control" on app_users;
-create policy "Super admin full control" on app_users for all
+drop policy if exists "Allow initial registration" on app_users;
+create policy "Allow initial registration" on app_users for insert
+with check (auth.uid() = id);
+
+drop policy if exists "Super admin full user control" on app_users;
+create policy "Super admin full user control" on app_users for all
 using (is_super_admin());
 
--- REGIONAL DATA Policies (Products, Categories, Logs, etc.)
--- These check if the warehouse_id of the row is inside the user's assigned_warehouses array.
+-- REGIONAL DATA POLICIES
+-- Logic: Row is accessible if user is Super Admin OR warehouse matches assigned_warehouses array.
 
 -- Products
 drop policy if exists "Regional product access" on products;
 create policy "Regional product access" on products for all
-using (
-  is_super_admin() or 
-  warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid())
-);
+using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
 -- Categories
 drop policy if exists "Regional category access" on categories;
 create policy "Regional category access" on categories for all
-using (
-  is_super_admin() or 
-  warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid())
-);
+using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
 -- Warehouses
 drop policy if exists "Warehouse visibility" on warehouses;
 create policy "Warehouse visibility" on warehouses for select
-using (
-  is_super_admin() or 
-  id = any (select assigned_warehouses from app_users where id = auth.uid())
-);
+using (is_super_admin() or id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
--- Logs
+-- Shared regional logic for Logs, Employees, Assignments, and Scrap
 drop policy if exists "Regional log access" on stock_logs;
 create policy "Regional log access" on stock_logs for all
-using (
-  is_super_admin() or 
-  warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid())
-);
-
--- Assignments, Employees, Scrapped Items (Same Logic)
-drop policy if exists "Regional assignment access" on assignments;
-create policy "Regional assignment access" on assignments for all
 using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
 drop policy if exists "Regional employee access" on employees;
 create policy "Regional employee access" on employees for all
 using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
+drop policy if exists "Regional assignment access" on assignments;
+create policy "Regional assignment access" on assignments for all
+using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
+
 drop policy if exists "Regional scrap access" on scrapped_items;
 create policy "Regional scrap access" on scrapped_items for all
 using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
 
--- 6. REFRESH
+-- 6. FORCE REFRESH
 NOTIFY pgrst, 'reload config';
 `;
 
@@ -248,7 +243,7 @@ NOTIFY pgrst, 'reload config';
               <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Tag className="text-blue-600" size={24} /> Categories</h3>
               {isSuperAdmin && (
                 <button onClick={() => setShowSchema(true)} className="flex items-center gap-2 text-[10px] font-black uppercase text-white bg-blue-600 px-4 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-                  <Database size={14} /> System SQL Repair (V4)
+                  <Database size={14} /> System SQL Repair (V4.1)
                 </button>
               )}
             </div>
@@ -389,8 +384,8 @@ NOTIFY pgrst, 'reload config';
             <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div>
-                        <h3 className="text-2xl font-black text-slate-900">Database Repair Terminal (V4)</h3>
-                        <p className="text-xs text-slate-500 mt-1 font-medium">Initializes core tables and robust RLS policies for complete regional security.</p>
+                        <h3 className="text-2xl font-black text-slate-900">Database Repair Terminal (V4.1)</h3>
+                        <p className="text-xs text-slate-500 mt-1 font-medium">Safe regional migration including registration-ready RLS policies.</p>
                     </div>
                     <button onClick={() => setShowSchema(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={24} /></button>
                 </div>
