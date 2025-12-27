@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Tag, AlertTriangle, BrainCircuit, Download, Upload, UserCog, ShieldCheck, Check, X, Lock, Database } from 'lucide-react';
+import { Plus, Trash2, Tag, AlertTriangle, BrainCircuit, UserCog, ShieldCheck, Check, X, Lock, Database } from 'lucide-react';
 import AIAdvisor from './AIAdvisor';
 import { Product, Assignment, ScrappedItem, Employee, AppUser } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -24,7 +23,6 @@ const Settings: React.FC<SettingsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'advisor' | 'account' | 'users'>('general');
   const [newCategory, setNewCategory] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [allUsers, setAllUsers] = useState<AppUser[]>([]);
   
   // Password Change State
@@ -106,58 +104,6 @@ const Settings: React.FC<SettingsProps> = ({
   const confirmDelete = () => {
     onDeleteCategory(deleteModal.category);
     setDeleteModal(prev => ({ ...prev, isOpen: false }));
-  };
-
-  const handleExport = () => {
-    const data = {
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      products,
-      categories,
-      assignments,
-      scrappedItems,
-      employees
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `great-river-backup-${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const result = event.target?.result;
-        if (typeof result === 'string') {
-          const data = JSON.parse(result);
-          if (Array.isArray(data.products)) {
-             if (window.confirm('This will overwrite your current data with the backup. Are you sure?')) {
-                 onImportData(data);
-             }
-          } else {
-             alert('Invalid backup file format.');
-          }
-        }
-      } catch (error) {
-        alert('Failed to parse backup file.');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   };
 
   const handlePasswordUpdate = async (e: React.FormEvent) => {
@@ -346,30 +292,6 @@ NOTIFY pgrst, 'reload config';
                     </button>
                     </div>
                 ))}
-                </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                <AlertTriangle className="text-amber-500" size={20} />
-                System Actions
-                </h3>
-                <div className="flex gap-4">
-                    <button 
-                      onClick={handleExport}
-                      className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                    >
-                        <Download size={18} />
-                        Export Data
-                    </button>
-                    <button 
-                      onClick={handleImportClick}
-                      className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors border border-slate-200"
-                    >
-                        <Upload size={18} />
-                        Import Data
-                    </button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
                 </div>
             </div>
         </div>
