@@ -75,7 +75,7 @@ const Inventory: React.FC<InventoryProps> = ({
             </button>
             <button onClick={onAddProduct} className={buttonClass}>
               <Plus size={16} className="text-blue-600" />
-              New Product
+              Create
             </button>
         </div>
       </div>

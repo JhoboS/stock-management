@@ -157,15 +157,14 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
 
             <div className="grid grid-cols-2 gap-4 col-span-1 md:col-span-2">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Initial Qty</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Unit Value (Stock)</label>
                 <input
                   type="number"
                   name="quantity"
                   min="0"
                   value={formData.quantity}
                   onChange={handleChange}
-                  readOnly={!!product}
-                  className={`w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm font-black ${product ? 'opacity-50' : ''}`}
+                  className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm font-black"
                 />
               </div>
               <div>
@@ -217,7 +216,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
             onClick={handleSubmit}
             className="order-1 md:order-2 flex-1 px-8 py-4 bg-slate-900 text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-800 shadow-xl shadow-slate-900/10 transition-all"
           >
-            {product ? 'Synchronize Record' : 'Confirm & Create'}
+            {product ? 'Save & Update' : 'Create'}
           </button>
         </div>
 
