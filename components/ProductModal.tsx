@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
-import { X, Sparkles, Loader2 } from 'lucide-react';
+import { X, Sparkles, Loader2, DollarSign } from 'lucide-react';
 import { generateProductDescription } from '../services/geminiService';
 
 interface ProductModalProps {
@@ -155,7 +155,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 col-span-1 md:col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 col-span-1 md:col-span-2">
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Unit Value (Stock)</label>
                 <input
@@ -164,7 +164,20 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
                   min="0"
                   value={formData.quantity}
                   onChange={handleChange}
-                  className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm font-black"
+                  readOnly={!!product}
+                  className={`w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm font-black ${product ? 'opacity-40 cursor-not-allowed' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Unit Price ($)</label>
+                <input
+                  type="number"
+                  name="price"
+                  min="0"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={handleChange}
+                  className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm font-black text-emerald-600"
                 />
               </div>
               <div>
