@@ -178,7 +178,9 @@ const App: React.FC = () => {
     try {
       await upsertProduct({ ...product, warehouseId: activeWarehouseId });
       await loadData();
-    } catch (error: any) { alert(`Failed: ${error.message}`); }
+    } catch (error: any) { 
+        alert(`Failed: ${error.message}. If this is a SKU/Name duplicate error across regions, please run the SQL Repair in Settings.`); 
+    }
   };
 
   const handleStockOperation = async (data: any) => {
@@ -313,7 +315,14 @@ const App: React.FC = () => {
                 {currentView === 'inventory' && <Inventory products={products} categories={categories} assignments={assignments} scrappedItems={scrappedItems} logs={stockLogs} onAddProduct={() => { setEditingProduct(undefined); setIsProductModalOpen(true); }} onEditProduct={(p) => { setEditingProduct(p); setIsProductModalOpen(true); }} onDeleteProduct={deleteProductApi} onInbound={() => { setStockOpType('INBOUND'); setSelectedStockProduct(undefined); setIsStockOpModalOpen(true); }} onAssign={(p) => { setStockOpType('ASSIGN'); setSelectedStockProduct(p); setIsStockOpModalOpen(true); }} onScrap={(p) => { setStockOpType('SCRAP'); setSelectedStockProduct(p); setIsStockOpModalOpen(true); }} />}
                 {currentView === 'employees' && <Employees employees={employees} assignments={assignments} onAddEmployee={handleAddEmployee} onReturnAsset={handleReturnAsset} />}
                 {currentView === 'logs' && <Logs logs={stockLogs} />}
-                {currentView === 'settings' && <Settings categories={categories} products={products} assignments={assignments} employees={employees} scrappedItems={scrappedItems} onAddCategory={(c) => addCategoryApi(c, activeWarehouseId).then(loadData)} onDeleteCategory={(c) => deleteCategoryApi(c, activeWarehouseId).then(loadData)} onImportData={() => {}} currentUser={currentUser} activeWarehouseId={activeWarehouseId} />}
+                {currentView === 'settings' && <Settings categories={categories} products={products} assignments={assignments} employees={employees} scrappedItems={scrappedItems} onAddCategory={async (c) => {
+                    try {
+                        await addCategoryApi(c, activeWarehouseId);
+                        await loadData();
+                    } catch (err: any) {
+                        alert(`Error adding category: ${err.message}. If this is a duplicate name error, please go to Settings > General and click 'System SQL Repair' to fix regional independence.`);
+                    }
+                }} onDeleteCategory={(c) => deleteCategoryApi(c, activeWarehouseId).then(loadData)} onImportData={() => {}} currentUser={currentUser} activeWarehouseId={activeWarehouseId} />}
               </div>
             )}
             </div>
