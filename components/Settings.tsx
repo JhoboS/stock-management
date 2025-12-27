@@ -106,10 +106,10 @@ const Settings: React.FC<SettingsProps> = ({
     } catch (err: any) { setPasswordMsg({ type: 'error', text: err.message }); }
   };
 
-  const sqlSchema = `-- REPAIR TERMINAL: REGIONAL INDEPENDENCE MIGRATION (V2)
--- This script force-removes global constraints to allow identical names across warehouses.
+  const sqlSchema = `-- REPAIR TERMINAL: REGIONAL INDEPENDENCE & RLS SECURITY (V3)
+-- This script secures your data and allows regional independence.
 
--- 1. Ensure warehouses table exists
+-- 1. TABLES INITIALIZATION
 create table if not exists warehouses (
   id uuid primary key default gen_random_uuid(), 
   name text not null, 
@@ -117,70 +117,102 @@ create table if not exists warehouses (
   created_at timestamptz default now()
 );
 
--- 2. Ensure Default "US Warehouse" exists
 insert into warehouses (id, name, location)
 select '00000000-0000-0000-0000-000000000000', 'US Warehouse', 'United States'
 where not exists (select 1 from warehouses where id = '00000000-0000-0000-0000-000000000000');
 
--- 3. CATEGORIES: Remove global name unique constraints
--- Check all possible constraint names that might exist from default setups
+-- 2. REGIONAL INDEPENDENCE FIXES (CATEGORIES & PRODUCTS)
 alter table categories drop constraint if exists categories_name_key;
 alter table categories drop constraint if exists categories_name_unique;
-alter table categories drop constraint if exists categories_pkey; -- In case name was PK
-
--- Ensure 'id' is the primary key
-alter table categories add column if not exists id uuid default gen_random_uuid();
-do $$ 
-begin 
-    if not exists (select 1 from pg_constraint where conname = 'categories_pkey') then
-        alter table categories add primary key (id);
-    end if;
-end $$;
-
--- Add warehouse_id and migrate orphans
 alter table categories add column if not exists warehouse_id uuid references warehouses(id);
 update categories set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
 
--- Add COMPOSITE unique constraint (name + warehouse_id)
-do $$ 
-begin 
-    if not exists (select 1 from pg_constraint where conname = 'categories_name_warehouse_unique') then
-        alter table categories add constraint categories_name_warehouse_unique unique (name, warehouse_id);
-    end if;
+do $$ begin 
+  if not exists (select 1 from pg_constraint where conname = 'categories_name_warehouse_unique') then
+    alter table categories add constraint categories_name_warehouse_unique unique (name, warehouse_id);
+  end if;
 end $$;
 
--- 4. PRODUCTS: Remove global SKU/Name unique constraints
 alter table products drop constraint if exists products_sku_key;
 alter table products drop constraint if exists products_name_key;
-
 alter table products add column if not exists warehouse_id uuid references warehouses(id);
 update products set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
 
--- Add composite unique constraints for Products
-do $$ 
-begin 
-    if not exists (select 1 from pg_constraint where conname = 'products_sku_warehouse_unique') then
-        alter table products add constraint products_sku_warehouse_unique unique (sku, warehouse_id);
-    end if;
+do $$ begin 
+  if not exists (select 1 from pg_constraint where conname = 'products_sku_warehouse_unique') then
+    alter table products add constraint products_sku_warehouse_unique unique (sku, warehouse_id);
+  end if;
 end $$;
 
--- 5. UPGRADE OTHER TABLES
-alter table employees add column if not exists warehouse_id uuid references warehouses(id);
-update employees set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
+-- 3. ENABLE ROW LEVEL SECURITY (RLS)
+alter table warehouses enable row level security;
+alter table products enable row level security;
+alter table categories enable row level security;
+alter table employees enable row level security;
+alter table assignments enable row level security;
+alter table scrapped_items enable row level security;
+alter table stock_logs enable row level security;
+alter table app_users enable row level security;
 
-alter table assignments add column if not exists warehouse_id uuid references warehouses(id);
-update assignments set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
+-- 4. CREATE SECURITY POLICIES
+-- NOTE: 'auth.jwt()->>''email''' gets the current logged-in user email.
 
-alter table scrapped_items add column if not exists warehouse_id uuid references warehouses(id);
-update scrapped_items set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
+-- General Rule: Super Admin (jhobo@grnesl.com) has full access to everything
+create or replace function is_super_admin() returns boolean as $$
+  begin
+    return (select auth.jwt()->>'email' = 'jhobo@grnesl.com');
+  end;
+$$ language plpgsql security definer;
 
-alter table stock_logs add column if not exists warehouse_id uuid references warehouses(id);
-update stock_logs set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
+-- Policy for APP_USERS: Everyone can read their own, Super Admin can see all
+drop policy if exists "Users can view their own profile" on app_users;
+create policy "Users can view their own profile" on app_users for select
+using (auth.uid() = id or is_super_admin());
 
--- 6. User Permissions
-alter table app_users add column if not exists assigned_warehouses uuid[] default '{}';
+drop policy if exists "Super Admins can update users" on app_users;
+create policy "Super Admins can update users" on app_users for all
+using (is_super_admin());
 
--- Final Reload
+-- Regional Policies: Access limited by assigned_warehouses array
+drop policy if exists "Users can access regional data" on products;
+create policy "Users can access regional data" on products for all
+using (
+  is_super_admin() or 
+  warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid())
+);
+
+drop policy if exists "Users can access regional categories" on categories;
+create policy "Users can access regional categories" on categories for all
+using (
+  is_super_admin() or 
+  warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid())
+);
+
+drop policy if exists "Users can access regional warehouses" on warehouses;
+create policy "Users can access regional warehouses" on warehouses for select
+using (
+  is_super_admin() or 
+  id = any (select assigned_warehouses from app_users where id = auth.uid())
+);
+
+-- Apply same logic to logs, employees, assignments, scrapped_items
+drop policy if exists "Users can access regional logs" on stock_logs;
+create policy "Users can access regional logs" on stock_logs for all
+using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
+
+drop policy if exists "Users can access regional employees" on employees;
+create policy "Users can access regional employees" on employees for all
+using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
+
+drop policy if exists "Users can access regional assignments" on assignments;
+create policy "Users can access regional assignments" on assignments for all
+using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
+
+drop policy if exists "Users can access regional scrapped" on scrapped_items;
+create policy "Users can access regional scrapped" on scrapped_items for all
+using (is_super_admin() or warehouse_id = any (select assigned_warehouses from app_users where id = auth.uid()));
+
+-- 5. RELOAD
 NOTIFY pgrst, 'reload config';
 `;
 
@@ -214,7 +246,7 @@ NOTIFY pgrst, 'reload config';
               <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Tag className="text-blue-600" size={24} /> Categories</h3>
               {isSuperAdmin && (
                 <button onClick={() => setShowSchema(true)} className="flex items-center gap-2 text-[10px] font-black uppercase text-white bg-blue-600 px-4 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-                  <Database size={14} /> System SQL Repair
+                  <Database size={14} /> System SQL Repair (V3)
                 </button>
               )}
             </div>
@@ -339,8 +371,8 @@ NOTIFY pgrst, 'reload config';
             <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div>
-                        <h3 className="text-2xl font-black text-slate-900">Database Repair Terminal</h3>
-                        <p className="text-xs text-slate-500 mt-1 font-medium">Initializes regional hubs and migrates legacy data to US Warehouse.</p>
+                        <h3 className="text-2xl font-black text-slate-900">Database Repair Terminal (V3)</h3>
+                        <p className="text-xs text-slate-500 mt-1 font-medium">Initializes regional hubs, fixes constraints, and enables secure RLS policies.</p>
                     </div>
                     <button onClick={() => setShowSchema(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={24} /></button>
                 </div>
@@ -348,7 +380,7 @@ NOTIFY pgrst, 'reload config';
                     <pre className="p-8 text-xs text-blue-300 font-mono leading-relaxed">{sqlSchema}</pre>
                 </div>
                 <div className="p-6 bg-slate-50 flex items-center justify-between border-t border-slate-200">
-                     <p className="text-[10px] font-bold text-slate-500 max-w-xs">Run this script in your Supabase SQL Editor to complete regional setup.</p>
+                     <p className="text-[10px] font-bold text-slate-500 max-w-xs">Run this script in your Supabase SQL Editor to secure your system with RLS.</p>
                      <div className="flex gap-3">
                         <button onClick={() => { navigator.clipboard.writeText(sqlSchema); alert("SQL Migration script copied to clipboard!"); }} className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all">Copy Migration Script</button>
                         <button onClick={() => setShowSchema(false)} className="px-6 py-3 bg-white text-slate-700 border border-slate-200 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50">Dismiss</button>
