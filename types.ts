@@ -1,8 +1,16 @@
 
+export interface Warehouse {
+  id: string;
+  name: string;
+  location?: string;
+  created_at?: string;
+}
+
 export interface Product {
   id: string;
-  name: string; // English Name
-  nameZh: string; // Chinese Name
+  warehouseId: string;
+  name: string;
+  nameZh: string;
   sku: string;
   category: string;
   quantity: number;
@@ -12,18 +20,9 @@ export interface Product {
   lastUpdated: string;
 }
 
-// Default categories for initialization, but system is now dynamic
-export const DEFAULT_CATEGORIES = [
-  'Electronics',
-  'Clothing',
-  'Home & Garden',
-  'Office Supplies',
-  'Food & Beverage',
-  'Other'
-];
-
 export interface Employee {
   id: string;
+  warehouseId: string;
   name: string;
   email: string;
   department: string;
@@ -46,6 +45,7 @@ export interface AIAnalysisResult {
 
 export interface Assignment {
   id: string;
+  warehouseId: string;
   productId: string;
   productName: string;
   productNameZh: string;
@@ -54,25 +54,27 @@ export interface Assignment {
   quantity: number;
   assignedDate: string;
   status: 'Active' | 'Returned';
-  performedBy: string; // Email of the admin who assigned it
+  performedBy: string;
 }
 
 export interface ScrappedItem {
   id: string;
+  warehouseId: string;
   productId: string;
   productName: string;
   productNameZh: string;
   quantity: number;
   reason: string;
   scrappedDate: string;
-  performedBy: string; // Email of the admin who scrapped it
+  performedBy: string;
 }
 
 export interface StockLog {
   id: string;
+  warehouseId: string;
   action: 'INBOUND' | 'UPDATE' | 'CREATE' | 'ASSIGN' | 'RETURN' | 'SCRAP';
   productName: string;
-  quantity: number; // Positive for inbound/return, negative logic handled in display usually
+  quantity: number;
   performedBy: string;
   date: string;
   details?: string;
@@ -83,6 +85,7 @@ export interface AppUser {
   email: string;
   is_approved: boolean;
   role: 'admin' | 'super_admin' | 'user';
+  assigned_warehouses: string[]; // Array of warehouse IDs
   created_at?: string;
 }
 

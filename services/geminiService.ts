@@ -1,39 +1,20 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product, AIAnalysisResult } from '../types';
 
-// Duplicate the safe env getter here to avoid circular deps or complex imports
-const getApiKey = (): string => {
-  try {
-    // @ts-ignore
-    if (import.meta?.env?.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
-    // @ts-ignore
-    if (import.meta?.env?.API_KEY) return import.meta.env.API_KEY;
-  } catch(e) {}
-
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-        return process.env.VITE_API_KEY || process.env.REACT_APP_API_KEY || process.env.API_KEY || '';
-    }
-  } catch(e) {}
-  
-  return '';
-};
-
-const getAIClient = () => {
-    const key = getApiKey();
-    if (!key) {
-        throw new Error("API Key is missing. Please add VITE_API_KEY to environment variables.");
-    }
-    return new GoogleGenAI({ apiKey: key });
-};
-
+/**
+ * Generates a short marketing description for a product.
+ * Uses 'gemini-3-flash-preview' for basic text tasks.
+ */
 export const generateProductDescription = async (name: string, category: string): Promise<string> => {
     try {
-        const ai = getAIClient();
+        // Initialize Gemini with the API key from process.env.API_KEY
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: `Write a compelling, short marketing description (max 2 sentences) for a product named "${name}" in the category "${category}".`,
         });
+        // Accessing generated text using the .text property
         return response.text || "No description generated.";
     } catch (error) {
         console.error("Gemini API Error:", error);
@@ -41,9 +22,14 @@ export const generateProductDescription = async (name: string, category: string)
     }
 };
 
+/**
+ * Analyzes inventory data and provides strategic recommendations.
+ * Uses 'gemini-3-pro-preview' for complex text tasks.
+ */
 export const analyzeInventory = async (products: Product[]): Promise<AIAnalysisResult> => {
     try {
-        const ai = getAIClient();
+        // Initialize Gemini with the API key from process.env.API_KEY
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         // Optimize payload size by sending only relevant fields
         const simplifiedInventory = products.map(p => ({
@@ -61,7 +47,7 @@ export const analyzeInventory = async (products: Product[]): Promise<AIAnalysisR
         `;
 
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -85,16 +71,18 @@ export const analyzeInventory = async (products: Product[]): Promise<AIAnalysisR
             }
         });
 
-        if (response.text) {
-             return JSON.parse(response.text) as AIAnalysisResult;
+        // Extracting text output directly from GenerateContentResponse
+        const jsonStr = response.text;
+        if (jsonStr) {
+             return JSON.parse(jsonStr.trim()) as AIAnalysisResult;
         }
         throw new Error("Empty response from AI");
 
     } catch (error) {
         console.error("Inventory Analysis Error:", error);
         return {
-            summary: "Unable to analyze inventory. Check if VITE_API_KEY is configured.",
-            recommendations: ["Check Vercel Environment Variables", "Ensure VITE_API_KEY is set"],
+            summary: "Unable to analyze inventory. Please ensure your API key and network connection are active.",
+            recommendations: ["Review stock levels manually", "Contact system administrator"],
             restockPriority: []
         };
     }

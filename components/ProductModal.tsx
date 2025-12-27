@@ -10,9 +10,11 @@ interface ProductModalProps {
   onSave: (product: Product) => void;
   categories: string[];
   product?: Product;
+  // Added warehouseId to match the Product interface requirements
+  warehouseId: string;
 }
 
-const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, categories, product }) => {
+const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, categories, product, warehouseId }) => {
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
     nameZh: '',
@@ -64,9 +66,11 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
     e.preventDefault();
     if (!formData.name || !formData.nameZh || !formData.sku) return;
     
+    // Fix: Include warehouseId to satisfy the required property in the Product type
     const newProduct: Product = {
       // Use crypto.randomUUID() for DB compatibility (vs legacy Date.now string)
       id: product?.id || crypto.randomUUID(),
+      warehouseId: product?.warehouseId || warehouseId,
       name: formData.name!,
       nameZh: formData.nameZh!,
       sku: formData.sku!,

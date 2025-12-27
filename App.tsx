@@ -1,11 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import Inventory from './components/Inventory';
 import ProductModal from './components/ProductModal';
 import StockOperationModal from './components/StockOperationModal';
-// import Scrapped from './components/Scrapped'; // Merged into Logs
 import Employees from './components/Employees';
 import Settings from './components/Settings';
 import Login from './components/Login';
@@ -16,11 +15,11 @@ import {
   fetchScrappedItems, addScrappedItemApi,
   fetchEmployees, addEmployeeApi,
   fetchCategories, addCategoryApi, deleteCategoryApi,
-  fetchAppUser, createAppUser, addStockLogApi, fetchStockLogs
+  fetchAppUser, createAppUser, addStockLogApi, fetchStockLogs, fetchWarehouses
 } from './services/storageService';
 import { supabase, isConfigured } from './services/supabaseClient';
-import { Product, Assignment, ScrappedItem, OperationType, Employee, AppUser, StockLog } from './types';
-import { Loader2, Database, AlertTriangle, Lock, XCircle } from 'lucide-react';
+import { Product, Assignment, ScrappedItem, OperationType, Employee, AppUser, StockLog, Warehouse } from './types';
+import { Loader2, Database, AlertTriangle, Lock, XCircle, Building2, ChevronDown, Check } from 'lucide-react';
 
 const SUPER_ADMIN_EMAIL = 'jhobo@grnesl.com';
 
@@ -31,6 +30,11 @@ const App: React.FC = () => {
   const [isApproved, setIsApproved] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
 
+  // Multi-Warehouse State
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [activeWarehouseId, setActiveWarehouseId] = useState<string>('');
+  const [isWhMenuOpen, setIsWhMenuOpen] = useState(false);
+
   // Data State
   const [currentView, setCurrentView] = useState('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
@@ -40,478 +44,174 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [stockLogs, setStockLogs] = useState<StockLog[]>([]);
   
-  // Modals state
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | undefined>(undefined);
-  
   const [isStockOpModalOpen, setIsStockOpModalOpen] = useState(false);
   const [stockOpType, setStockOpType] = useState<OperationType>('INBOUND');
   const [selectedStockProduct, setSelectedStockProduct] = useState<Product | undefined>(undefined);
 
-  // Auth Check
-  useEffect(() => {
-    if (!isConfigured) {
-      setIsLoading(false);
-      return;
-    }
+  // Active Warehouse Object
+  const activeWarehouse = useMemo(() => warehouses.find(w => w.id === activeWarehouseId), [warehouses, activeWarehouseId]);
+  
+  // Restricted warehouses for current user
+  const userWarehouses = useMemo(() => {
+    if (!currentUser) return [];
+    if (currentUser.role === 'super_admin') return warehouses;
+    return warehouses.filter(w => currentUser.assigned_warehouses.includes(w.id));
+  }, [warehouses, currentUser]);
 
+  useEffect(() => {
+    if (!isConfigured) { setIsLoading(false); return; }
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (!session) setIsLoading(false);
     });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (!session) setIsLoading(false);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // User Profile & Data Loading
   useEffect(() => {
     const checkUserAndLoad = async () => {
       if (session && isConfigured) {
         setIsLoading(true);
         const email = session.user.email;
-        
         try {
-          // 1. Check Super Admin hardcode
-          if (email === SUPER_ADMIN_EMAIL) {
-            try {
-                const existingAdmin = await fetchAppUser(email);
-                if (!existingAdmin) {
-                    await createAppUser({
-                        id: session.user.id,
-                        email,
-                        role: 'super_admin',
-                        is_approved: true
-                    });
-                }
-            } catch (e) {
-                console.warn("Could not sync admin to DB (tables might be missing)", e);
-            }
+          const allWh = await fetchWarehouses();
+          setWarehouses(allWh);
 
+          let appUser = await fetchAppUser(email);
+          if (!appUser && email === SUPER_ADMIN_EMAIL) {
+            appUser = { id: session.user.id, email, role: 'super_admin', is_approved: true, assigned_warehouses: [] };
+            await createAppUser(appUser);
+          } else if (!appUser) {
+            appUser = { id: session.user.id, email, role: 'user', is_approved: false, assigned_warehouses: [] };
+            await createAppUser(appUser);
+          }
+
+          setCurrentUser(appUser);
+          if (appUser.is_approved) {
             setIsApproved(true);
-            setCurrentUser({ id: session.user.id, email, role: 'super_admin', is_approved: true });
-            await loadData();
-          } else {
-            // 2. Check App Users table
-            let appUser = await fetchAppUser(email);
-            
-            if (!appUser) {
-              appUser = {
-                id: session.user.id,
-                email,
-                role: 'user',
-                is_approved: false
-              };
-              await createAppUser(appUser);
-            }
-
-            setCurrentUser(appUser);
-            if (appUser.is_approved) {
-              setIsApproved(true);
-              await loadData();
-            } else {
-              setIsApproved(false);
+            // Default to first assigned warehouse or first existing if super admin
+            const initialWhId = appUser.role === 'super_admin' ? allWh[0]?.id : appUser.assigned_warehouses[0];
+            if (initialWhId) {
+                setActiveWarehouseId(initialWhId);
             }
           }
-        } catch (error) {
-          console.error("Auth flow error", error);
-        } finally {
-          setIsLoading(false);
-        }
+        } catch (error) { console.error(error); } finally { setIsLoading(false); }
       }
     };
-
     checkUserAndLoad();
   }, [session]);
+
+  // Re-fetch data whenever the warehouse changes
+  useEffect(() => {
+    if (activeWarehouseId && isApproved) {
+        loadData();
+    }
+  }, [activeWarehouseId]);
 
   const handleError = (error: any) => {
     const msg = error.message || "Unknown error";
     if (msg.includes('column') || msg.includes('relation') || msg.includes('does not exist')) {
-        setSchemaError("Database Schema Mismatch: Tables or columns are missing. Please go to Settings > View Database Schema and run the repair script.");
+        setSchemaError("Database Schema Mismatch: Multi-Warehouse columns missing. Go to Settings > SQL Repair.");
     }
   };
 
   const loadData = async () => {
+    if (!activeWarehouseId) return;
     try {
       const [prod, assign, scrap, emp, cats, logs] = await Promise.all([
-        fetchProducts(),
-        fetchAssignments(),
-        fetchScrappedItems(),
-        fetchEmployees(),
-        fetchCategories(),
-        fetchStockLogs()
+        fetchProducts(activeWarehouseId),
+        fetchAssignments(activeWarehouseId),
+        fetchScrappedItems(activeWarehouseId),
+        fetchEmployees(activeWarehouseId),
+        fetchCategories(activeWarehouseId),
+        fetchStockLogs(activeWarehouseId)
       ]);
-      setProducts(prod);
-      setAssignments(assign);
-      setScrappedItems(scrap);
-      setEmployees(emp);
-      setCategories(cats);
-      setStockLogs(logs);
+      setProducts(prod); setAssignments(assign); setScrappedItems(scrap); setEmployees(emp); setCategories(cats); setStockLogs(logs);
       setSchemaError(null); 
-    } catch (error: any) {
-      console.error("Failed to load data", error);
-      handleError(error);
-    }
+    } catch (error: any) { handleError(error); }
   };
 
   const handleSaveProduct = async (product: Product) => {
     try {
-      const isNew = !products.find(p => p.id === product.id);
-      let updatedProducts;
-      if (editingProduct) {
-        updatedProducts = products.map(p => p.id === product.id ? product : p);
-      } else {
-        updatedProducts = [...products, product];
-      }
-      setProducts(updatedProducts);
-      
-      await upsertProduct(product);
-      setSchemaError(null);
-      
-      if (isNew) {
-        const log: StockLog = {
-          id: crypto.randomUUID(),
-          action: 'CREATE',
-          productName: product.name,
-          quantity: product.quantity,
-          performedBy: session.user.email,
-          date: new Date().toISOString()
-        };
-        await addStockLogApi(log);
-        setStockLogs([log, ...stockLogs]);
-      }
-
-      const refreshed = await fetchProducts();
-      setProducts(refreshed);
-    } catch (error: any) {
-      console.error(error);
-      handleError(error);
-      alert(`Failed to save product: ${error.message}`);
-      loadData(); 
-    }
-  };
-
-  const handleDeleteProduct = async (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      try {
-        const updatedProducts = products.filter(p => p.id !== id);
-        setProducts(updatedProducts);
-        await deleteProductApi(id);
-      } catch (error) {
-        alert("Failed to delete product");
-        loadData();
-      }
-    }
+      const pWithWh = { ...product, warehouseId: activeWarehouseId };
+      await upsertProduct(pWithWh);
+      await loadData();
+    } catch (error: any) { alert(`Failed: ${error.message}`); }
   };
 
   const handleStockOperation = async (data: any) => {
     const { productId, quantity, type, employeeId, employeeName, reason, productName, productNameZh } = data;
     const userEmail = session.user.email;
-    
     try {
-      // 1. Update Product Stock
       const product = products.find(p => p.id === productId);
       if (!product) return;
-
-      // Inbound adds stock, Assign/Scrap reduces stock
       const newQuantity = type === 'INBOUND' ? product.quantity + quantity : Math.max(0, product.quantity - quantity);
       const updatedProduct = { ...product, quantity: newQuantity, lastUpdated: new Date().toISOString() };
-      
-      setProducts(products.map(p => p.id === productId ? updatedProduct : p));
       await upsertProduct(updatedProduct);
 
-      // 2. Perform Specific Action & LOG IT
       if (type === 'ASSIGN') {
-        const newAssignment: Assignment = {
-          id: crypto.randomUUID(),
-          productId,
-          productName,
-          productNameZh: productNameZh || '',
-          employeeId,
-          employeeName,
-          quantity,
-          assignedDate: new Date().toISOString(),
-          status: 'Active',
-          performedBy: userEmail
-        };
-        setAssignments([...assignments, newAssignment]);
+        const newAssignment: Assignment = { id: crypto.randomUUID(), warehouseId: activeWarehouseId, productId, productName, productNameZh: productNameZh || '', employeeId, employeeName, quantity, assignedDate: new Date().toISOString(), status: 'Active', performedBy: userEmail };
         await addAssignmentApi(newAssignment);
-        
-        // Log Assignment
-        const log: StockLog = {
-            id: crypto.randomUUID(),
-            action: 'ASSIGN',
-            productName: productName,
-            quantity: quantity,
-            performedBy: userEmail,
-            date: new Date().toISOString(),
-            details: `Assigned to ${employeeName}`
-        };
-        setStockLogs([log, ...stockLogs]);
-        await addStockLogApi(log);
-
+        await addStockLogApi({ id: crypto.randomUUID(), warehouseId: activeWarehouseId, action: 'ASSIGN', productName, quantity, performedBy: userEmail, date: new Date().toISOString(), details: `Assigned to ${employeeName}` });
       } else if (type === 'SCRAP') {
-        const newScrap: ScrappedItem = {
-          id: crypto.randomUUID(),
-          productId,
-          productName,
-          productNameZh: productNameZh || '',
-          quantity,
-          reason,
-          scrappedDate: new Date().toISOString(),
-          performedBy: userEmail
-        };
-        setScrappedItems([newScrap, ...scrappedItems]);
+        const newScrap: ScrappedItem = { id: crypto.randomUUID(), warehouseId: activeWarehouseId, productId, productName, productNameZh: productNameZh || '', quantity, reason, scrappedDate: new Date().toISOString(), performedBy: userEmail };
         await addScrappedItemApi(newScrap);
-
-        // Log Scrap
-        const log: StockLog = {
-            id: crypto.randomUUID(),
-            action: 'SCRAP',
-            productName: productName,
-            quantity: quantity,
-            performedBy: userEmail,
-            date: new Date().toISOString(),
-            details: `Reason: ${reason}`
-        };
-        setStockLogs([log, ...stockLogs]);
-        await addStockLogApi(log);
-
+        await addStockLogApi({ id: crypto.randomUUID(), warehouseId: activeWarehouseId, action: 'SCRAP', productName, quantity, performedBy: userEmail, date: new Date().toISOString(), details: `Reason: ${reason}` });
       } else if (type === 'INBOUND') {
-         const log: StockLog = {
-             id: crypto.randomUUID(),
-             action: 'INBOUND',
-             productName: product.name,
-             quantity: quantity,
-             performedBy: userEmail,
-             date: new Date().toISOString()
-         };
-         setStockLogs([log, ...stockLogs]);
-         await addStockLogApi(log);
+         await addStockLogApi({ id: crypto.randomUUID(), warehouseId: activeWarehouseId, action: 'INBOUND', productName: product.name, quantity, performedBy: userEmail, date: new Date().toISOString() });
       }
-      setSchemaError(null);
-    } catch (error: any) {
-      console.error(error);
-      handleError(error);
-      alert(`Operation failed: ${error.message}`);
-      loadData();
-    }
+      await loadData();
+    } catch (error: any) { handleError(error); }
   };
 
   const handleReturnAsset = async (assignment: Assignment) => {
       try {
-        // 1. Update Product Stock (Increase)
         const product = products.find(p => p.id === assignment.productId);
         if (product) {
-            const updatedProduct = { ...product, quantity: product.quantity + assignment.quantity, lastUpdated: new Date().toISOString() };
-            setProducts(products.map(p => p.id === product.id ? updatedProduct : p));
-            await upsertProduct(updatedProduct);
+            await upsertProduct({ ...product, quantity: product.quantity + assignment.quantity, lastUpdated: new Date().toISOString() });
         }
-
-        // 2. Update Assignment Status
-        const updatedAssignments = assignments.map(a => a.id === assignment.id ? { ...a, status: 'Returned' as const } : a);
-        setAssignments(updatedAssignments);
         await returnAssignmentApi(assignment.id);
-
-        // 3. Log Return
-        const log: StockLog = {
-            id: crypto.randomUUID(),
-            action: 'RETURN',
-            productName: assignment.productName,
-            quantity: assignment.quantity,
-            performedBy: session.user.email,
-            date: new Date().toISOString(),
-            details: `Returned from ${assignment.employeeName}`
-        };
-        setStockLogs([log, ...stockLogs]);
-        await addStockLogApi(log);
-
-      } catch (error: any) {
-          handleError(error);
-          alert("Failed to return asset");
-          loadData();
-      }
+        await addStockLogApi({ id: crypto.randomUUID(), warehouseId: activeWarehouseId, action: 'RETURN', productName: assignment.productName, quantity: assignment.quantity, performedBy: session.user.email, date: new Date().toISOString(), details: `Returned from ${assignment.employeeName}` });
+        await loadData();
+      } catch (error: any) { handleError(error); }
   };
 
   const handleAddEmployee = async (newEmployee: Employee) => {
     try {
-      setEmployees([...employees, newEmployee]);
-      await addEmployeeApi(newEmployee);
-      setSchemaError(null);
-    } catch (error: any) {
-      handleError(error);
-      alert("Failed to add employee");
-      loadData();
-    }
+      await addEmployeeApi({ ...newEmployee, warehouseId: activeWarehouseId });
+      await loadData();
+    } catch (error: any) { handleError(error); }
   };
 
   const handleAddCategory = async (cat: string) => {
       if (!categories.includes(cat)) {
-          try {
-            setCategories([...categories, cat]);
-            await addCategoryApi(cat);
-          } catch (e: any) {
-            handleError(e);
-            alert("Failed to add category");
-            loadData();
-          }
+          try { await addCategoryApi(cat, activeWarehouseId); await loadData(); } catch (e: any) { handleError(e); }
       }
   };
 
   const handleDeleteCategory = async (cat: string) => {
-      try {
-        const updatedCategories = categories.filter(c => c !== cat);
-        setCategories(updatedCategories);
-        await deleteCategoryApi(cat);
-      } catch (e) {
-        alert("Failed to delete category");
-        loadData();
-      }
+      try { await deleteCategoryApi(cat, activeWarehouseId); await loadData(); } catch (e) { alert("Failed"); }
   };
 
-  const handleImportData = async (data: any) => {
-    alert("Bulk import is not fully supported in Cloud Mode yet to prevent data conflicts. Please add items manually.");
-  };
-  
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
+  const handleLogout = async () => { await supabase.auth.signOut(); };
 
-  // Modal Triggers
-  const openAddModal = () => {
-    setEditingProduct(undefined);
-    setIsProductModalOpen(true);
-  };
+  if (!session) return <Login />;
+  if (isLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4"><Loader2 className="animate-spin text-blue-600" size={48} /><p className="font-medium animate-pulse">Switching Warehouse...</p></div>;
 
-  const openEditModal = (product: Product) => {
-    setEditingProduct(product);
-    setIsProductModalOpen(true);
-  };
-
-  const openStockOpModal = (type: OperationType, product?: Product) => {
-    setStockOpType(type);
-    setSelectedStockProduct(product);
-    setIsStockOpModalOpen(true);
-  };
-
-  const renderContent = () => {
-    switch (currentView) {
-      case 'dashboard':
-        return <Dashboard products={products} />;
-      case 'inventory':
-        return (
-          <Inventory 
-            products={products} 
-            categories={categories}
-            assignments={assignments}
-            scrappedItems={scrappedItems}
-            logs={stockLogs}
-            onAddProduct={openAddModal}
-            onEditProduct={openEditModal}
-            onDeleteProduct={handleDeleteProduct}
-            onInbound={() => openStockOpModal('INBOUND')}
-            onAssign={(p) => openStockOpModal('ASSIGN', p)}
-            onScrap={(p) => openStockOpModal('SCRAP', p)}
-          />
-        );
-      case 'employees':
-        return <Employees employees={employees} assignments={assignments} onAddEmployee={handleAddEmployee} onReturnAsset={handleReturnAsset} />;
-      case 'scrapped': // Redirect to Logs in UI or keep as alias if needed, but removing separate view in logic
-        return <Logs logs={stockLogs} />;
-      case 'logs':
-        return <Logs logs={stockLogs} />;
-      case 'settings':
-        return (
-          <Settings 
-            categories={categories} 
-            products={products} 
-            assignments={assignments}
-            employees={employees}
-            scrappedItems={scrappedItems}
-            onAddCategory={handleAddCategory} 
-            onDeleteCategory={handleDeleteCategory} 
-            onImportData={handleImportData}
-            currentUser={currentUser}
-          />
-        );
-      default:
-        return <Dashboard products={products} />;
-    }
-  };
-
-  if (!isConfigured) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white max-w-lg w-full rounded-2xl shadow-xl p-8 text-center space-y-6 animate-fade-in">
-          <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
-            <Database size={32} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Connect to Database</h1>
-            <p className="text-slate-500">
-              To use the cloud storage features, you must connect your Supabase database.
-            </p>
-          </div>
-          
-          <div className="bg-slate-100 p-4 rounded-lg text-left text-sm space-y-3 font-mono text-slate-700">
-            <div className="flex items-center gap-2 text-amber-600 font-sans font-bold text-xs uppercase tracking-wider mb-1">
-              <AlertTriangle size={12} />
-              Missing Environment Variables
-            </div>
-            <div>
-              <p className="text-slate-400 text-xs mb-1">Project URL</p>
-              <div className="bg-white p-2 rounded border border-slate-200 break-all">
-                SUPABASE_URL
-              </div>
-            </div>
-            <div>
-              <p className="text-slate-400 text-xs mb-1">Public Anon Key</p>
-              <div className="bg-white p-2 rounded border border-slate-200 break-all">
-                SUPABASE_ANON_KEY
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return <Login />;
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 text-slate-500 gap-4">
-        <Loader2 className="animate-spin text-blue-600" size={48} />
-        <p className="font-medium animate-pulse">Syncing with Great River Database...</p>
-      </div>
-    );
-  }
-
-  if (!isApproved) {
+  if (!isApproved || (currentUser?.role !== 'super_admin' && currentUser?.assigned_warehouses.length === 0)) {
      return (
-        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden animate-fade-in text-center p-10">
-                <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Lock size={40} />
-                </div>
-                <h1 className="text-2xl font-bold text-slate-900 mb-2">Account Pending Approval</h1>
-                <p className="text-slate-500 mb-6">
-                    Your account ({session.user.email}) has been created but requires approval from an administrator.
-                </p>
-                <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-600 mb-6">
-                    Please contact <strong>jhobo@grnesl.com</strong> to activate your access.
-                </div>
-                <button onClick={handleLogout} className="text-blue-600 hover:text-blue-800 font-medium text-sm">
-                    Sign Out and Check Later
-                </button>
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-10 text-center">
+                <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6"><Lock size={40} /></div>
+                <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Restricted</h1>
+                <p className="text-slate-500 mb-6">Your account requires approval and at least one assigned warehouse to begin.</p>
+                <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-600 mb-6 font-medium">Contact Administrator (jhobo@grnesl.com)</div>
+                <button onClick={handleLogout} className="text-blue-600 hover:text-blue-800 font-bold">Sign Out</button>
             </div>
         </div>
      );
@@ -519,83 +219,60 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 relative flex-col">
-      {/* Schema Error Banner */}
-      {schemaError && (
-        <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between shadow-md z-50">
-            <div className="flex items-center gap-2 text-sm font-medium">
-                <AlertTriangle size={18} />
-                {schemaError}
-            </div>
-            <div className="flex gap-4">
-                <button 
-                  onClick={() => setCurrentView('settings')} 
-                  className="bg-white text-red-600 px-3 py-1 rounded text-xs font-bold hover:bg-red-50"
-                >
-                    Go to Settings
-                </button>
-                <button onClick={() => setSchemaError(null)} className="opacity-80 hover:opacity-100">
-                    <XCircle size={18} />
-                </button>
-            </div>
-        </div>
-      )}
+      {schemaError && <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between shadow-md z-50"><div className="flex items-center gap-2 text-sm font-medium"><AlertTriangle size={18} />{schemaError}</div><button onClick={() => setCurrentView('settings')} className="bg-white text-red-600 px-3 py-1 rounded text-xs font-bold">Fix Schema</button></div>}
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-        
         <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen">
             <div className="max-w-7xl mx-auto">
-            {/* Header */}
             <header className="mb-8 flex justify-between items-center">
                 <div>
-                <h2 className="text-2xl font-bold text-slate-800 capitalize">
-                    {currentView === 'scrapped' ? 'System Logs' : 
-                    currentView === 'employees' ? 'Staff Management' :
-                    currentView === 'logs' ? 'History & Logs' :
-                    currentView === 'settings' ? 'System Settings' : currentView}
-                </h2>
-                <p className="text-slate-500">
-                    {currentView === 'dashboard' && `Overview of ${products.length} products`}
-                    {currentView === 'inventory' && 'Manage your stock catalogue and view history'}
-                    {currentView === 'employees' && 'Manage staff and track asset assignments'}
-                    {currentView === 'logs' && 'View all system transactions and history'}
-                    {currentView === 'settings' && 'Configure system preferences and users'}
-                </p>
+                  <h2 className="text-2xl font-bold text-slate-800 capitalize">{currentView}</h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-slate-500">Managing:</span>
+                    <div className="relative">
+                        <button onClick={() => setIsWhMenuOpen(!isWhMenuOpen)} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1 rounded-lg text-sm font-bold text-blue-600 shadow-sm hover:border-blue-400 transition-all">
+                            <Building2 size={14} /> {activeWarehouse?.name || 'Select Warehouse'} <ChevronDown size={14} />
+                        </button>
+                        {isWhMenuOpen && (
+                            <div className="absolute top-full left-0 mt-2 w-56 bg-white border rounded-xl shadow-xl z-50 overflow-hidden py-1 animate-fade-in">
+                                <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-400 border-b mb-1">Your Assigned Warehouses</div>
+                                {userWarehouses.map(wh => (
+                                    <button 
+                                        key={wh.id} 
+                                        onClick={() => { setActiveWarehouseId(wh.id); setIsWhMenuOpen(false); }}
+                                        className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-50 ${activeWarehouseId === wh.id ? 'text-blue-600 font-bold bg-blue-50' : 'text-slate-600'}`}
+                                    >
+                                        {wh.name}
+                                        {activeWarehouseId === wh.id && <Check size={14} />}
+                                    </button>
+                                ))}
+                                {userWarehouses.length === 0 && <div className="p-4 text-xs text-slate-400 italic">No warehouses found.</div>}
+                            </div>
+                        )}
+                    </div>
+                  </div>
                 </div>
-                
                 <div className="flex items-center gap-3">
-                <div className="text-right hidden sm:block">
+                  <div className="text-right hidden sm:block">
                     <p className="text-sm font-medium text-slate-900">{session.user.email}</p>
-                    <button onClick={handleLogout} className="text-xs text-red-500 hover:text-red-700 font-medium">Sign Out</button>
-                </div>
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-white shadow-sm">
-                    {session.user.email?.substring(0,2).toUpperCase()}
-                </div>
+                    <button onClick={handleLogout} className="text-xs text-red-500 font-medium">Sign Out</button>
+                  </div>
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-white shadow-sm">{session.user.email?.substring(0,2).toUpperCase()}</div>
                 </div>
             </header>
 
-            {renderContent()}
+            {currentView === 'dashboard' && <Dashboard products={products} />}
+            {currentView === 'inventory' && <Inventory products={products} categories={categories} assignments={assignments} scrappedItems={scrappedItems} logs={stockLogs} onAddProduct={() => { setEditingProduct(undefined); setIsProductModalOpen(true); }} onEditProduct={(p) => { setEditingProduct(p); setIsProductModalOpen(true); }} onDeleteProduct={deleteProductApi} onInbound={() => { setStockOpType('INBOUND'); setSelectedStockProduct(undefined); setIsStockOpModalOpen(true); }} onAssign={(p) => { setStockOpType('ASSIGN'); setSelectedStockProduct(p); setIsStockOpModalOpen(true); }} onScrap={(p) => { setStockOpType('SCRAP'); setSelectedStockProduct(p); setIsStockOpModalOpen(true); }} />}
+            {currentView === 'employees' && <Employees employees={employees} assignments={assignments} onAddEmployee={handleAddEmployee} onReturnAsset={handleReturnAsset} />}
+            {currentView === 'logs' && <Logs logs={stockLogs} />}
+            {currentView === 'settings' && <Settings categories={categories} products={products} assignments={assignments} employees={employees} scrappedItems={scrappedItems} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} onImportData={() => {}} currentUser={currentUser} activeWarehouseId={activeWarehouseId} />}
             </div>
         </main>
       </div>
 
-      <ProductModal 
-        isOpen={isProductModalOpen} 
-        onClose={() => setIsProductModalOpen(false)} 
-        onSave={handleSaveProduct}
-        categories={categories}
-        product={editingProduct}
-      />
-
-      <StockOperationModal
-        isOpen={isStockOpModalOpen}
-        onClose={() => setIsStockOpModalOpen(false)}
-        onSubmit={handleStockOperation}
-        type={stockOpType}
-        products={products}
-        employees={employees}
-        initialProduct={selectedStockProduct}
-      />
+      <ProductModal isOpen={isProductModalOpen} onClose={() => setIsProductModalOpen(false)} onSave={handleSaveProduct} categories={categories} product={editingProduct} warehouseId={activeWarehouseId} />
+      <StockOperationModal isOpen={isStockOpModalOpen} onClose={() => setIsStockOpModalOpen(false)} onSubmit={handleStockOperation} type={stockOpType} products={products} employees={employees} initialProduct={selectedStockProduct} />
     </div>
   );
 };
