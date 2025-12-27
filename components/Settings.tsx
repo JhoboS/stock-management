@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Tag, AlertTriangle, BrainCircuit, UserCog, ShieldCheck, Check, X, Lock, Database, MapPin, Building2, Save } from 'lucide-react';
+import { Plus, Trash2, Tag, AlertTriangle, BrainCircuit, UserCog, ShieldCheck, Check, X, Lock, Database, MapPin, Building2, Globe } from 'lucide-react';
 import AIAdvisor from './AIAdvisor';
 import { Product, Assignment, ScrappedItem, Employee, AppUser, Warehouse } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -69,7 +68,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const toggleWarehouseForUser = async (userEmail: string, warehouseId: string) => {
     const user = allUsers.find(u => u.email === userEmail);
-    if (!user) return;
+    if (!user || user.role === 'super_admin') return; // Super Admins have inherent access to all
 
     let updatedList = [...user.assigned_warehouses];
     if (updatedList.includes(warehouseId)) {
@@ -230,6 +229,7 @@ NOTIFY pgrst, 'reload config';
                   <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
                     <tr>
                       <th className="px-6 py-3">User</th>
+                      <th className="px-6 py-3">Role</th>
                       <th className="px-6 py-3">Status</th>
                       <th className="px-6 py-3">Warehouse Access</th>
                       <th className="px-6 py-3 text-right">Actions</th>
@@ -240,23 +240,36 @@ NOTIFY pgrst, 'reload config';
                       <tr key={user.email} className="hover:bg-slate-50">
                         <td className="px-6 py-4">
                           <div className="font-medium text-slate-900">{user.email}</div>
-                          <div className="text-[10px] text-slate-400 uppercase font-bold tracking-tight">{user.role}</div>
+                          {user.email === 'jhobo@grnesl.com' && <div className="text-[9px] text-blue-500 font-bold uppercase">System Owner</div>}
+                        </td>
+                        <td className="px-6 py-4">
+                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${user.role === 'super_admin' ? 'bg-indigo-50 text-indigo-600 border-indigo-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                             {user.role.replace('_', ' ')}
+                           </span>
                         </td>
                         <td className="px-6 py-4">
                           {user.is_approved ? <span className="bg-green-50 text-green-600 px-2 py-1 rounded-full text-[10px] font-bold">ACTIVE</span> : <span className="bg-amber-50 text-amber-600 px-2 py-1 rounded-full text-[10px] font-bold">PENDING</span>}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1.5">
-                            {warehouses.map(wh => (
-                              <button 
-                                key={wh.id} 
-                                onClick={() => toggleWarehouseForUser(user.email, wh.id)}
-                                className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all border ${user.assigned_warehouses.includes(wh.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-200'}`}
-                              >
-                                {wh.name}
-                              </button>
-                            ))}
-                          </div>
+                          {user.role === 'super_admin' ? (
+                            <div className="flex items-center gap-1.5 text-indigo-600 bg-indigo-50 px-2 py-1 rounded border border-indigo-100 w-fit">
+                                <Globe size={12} />
+                                <span className="text-[10px] font-bold uppercase">Global Access</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {warehouses.map(wh => (
+                                <button 
+                                  key={wh.id} 
+                                  onClick={() => toggleWarehouseForUser(user.email, wh.id)}
+                                  className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all border ${user.assigned_warehouses.includes(wh.id) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-200 hover:border-blue-400'}`}
+                                >
+                                  {wh.name}
+                                </button>
+                              ))}
+                              {warehouses.length === 0 && <span className="text-[10px] text-slate-400 italic">No warehouses created</span>}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-right">
                            {user.email !== 'jhobo@grnesl.com' && (
