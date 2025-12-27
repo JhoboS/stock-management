@@ -19,7 +19,7 @@ import {
 } from './services/storageService';
 import { supabase, isConfigured } from './services/supabaseClient';
 import { Product, Assignment, ScrappedItem, OperationType, Employee, AppUser, StockLog, Warehouse } from './types';
-import { Loader2, AlertTriangle, Lock, Building2, ChevronDown, Check, Layout, ShieldCheck, Menu } from 'lucide-react';
+import { Loader2, AlertTriangle, Lock, Building2, ChevronDown, Check, Layout, ShieldCheck, Menu, LogOut } from 'lucide-react';
 
 const SUPER_ADMIN_EMAIL = 'jhobo@grnesl.com';
 const DEFAULT_WH_ID = '00000000-0000-0000-0000-000000000000';
@@ -281,9 +281,9 @@ const App: React.FC = () => {
         <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-[calc(100vh-64px)] md:h-screen bg-slate-50/50 transition-all duration-300">
             <div className="max-w-7xl mx-auto">
             <header className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                <div>
+                <div className="flex flex-col gap-1">
                   <h2 className="text-xl md:text-2xl font-black text-slate-900 capitalize tracking-tight">{currentView}</h2>
-                  <div className="flex items-center gap-2 mt-1.5">
+                  <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Region</span>
                     <div className="relative">
                         <button onClick={() => setIsWhMenuOpen(!isWhMenuOpen)} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[11px] md:text-xs font-bold text-blue-600 shadow-sm hover:border-blue-300 transition-all">
@@ -308,13 +308,19 @@ const App: React.FC = () => {
                 <div className="hidden sm:flex items-center gap-5">
                   <div className="text-right">
                     <p className="text-sm font-black text-slate-900">{session.user.email}</p>
-                    <div className="flex items-center gap-2 justify-end mt-0.5">
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${isSuperAdminUser ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{isSuperAdminUser ? 'Owner' : 'Staff'}</span>
-                      <button onClick={handleLogout} className="text-[9px] text-red-500 font-black uppercase hover:underline">Exit</button>
+                    <div className="flex items-center gap-2 justify-end mt-1">
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${isSuperAdminUser ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{isSuperAdminUser ? 'Owner' : 'Staff'}</span>
+                      <button 
+                        onClick={handleLogout} 
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-black uppercase hover:bg-red-600 hover:text-white transition-all shadow-sm group"
+                      >
+                        <LogOut size={12} className="transition-transform group-hover:translate-x-0.5" />
+                        Exit Session
+                      </button>
                     </div>
                   </div>
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-lg shadow-xl ring-4 ring-white select-none">
-                    {isSuperAdminUser ? <ShieldCheck size={24} /> : session.user.email?.substring(0,1).toUpperCase()}
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-xl shadow-xl ring-4 ring-white select-none">
+                    {isSuperAdminUser ? <ShieldCheck size={28} /> : session.user.email?.substring(0,1).toUpperCase()}
                   </div>
                 </div>
             </header>

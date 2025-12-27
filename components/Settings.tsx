@@ -221,22 +221,22 @@ NOTIFY pgrst, 'reload config';
 
   return (
     <div className="space-y-6 animate-fade-in max-w-6xl">
-       <div className="flex space-x-1 bg-slate-100 p-1 rounded-lg w-fit mb-6 overflow-x-auto">
-        <button onClick={() => setActiveTab('general')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'general' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+       <div className="flex space-x-1 bg-slate-100 p-1.5 rounded-2xl w-full sm:w-fit mb-6 overflow-x-auto no-scrollbar scroll-smooth">
+        <button onClick={() => setActiveTab('general')} className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${activeTab === 'general' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <Tag size={16} /> General
         </button>
-        <button onClick={() => setActiveTab('account')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'account' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <UserCog size={16} /> My Account
+        <button onClick={() => setActiveTab('account')} className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${activeTab === 'account' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          <UserCog size={16} /> Security
         </button>
-        <button onClick={() => setActiveTab('advisor')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'advisor' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <BrainCircuit size={16} /> AI Advisor
+        <button onClick={() => setActiveTab('advisor')} className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${activeTab === 'advisor' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+          <BrainCircuit size={16} /> AI Assistant
         </button>
         {isSuperAdmin && (
           <>
-            <button onClick={() => setActiveTab('users')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'users' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-              <ShieldCheck size={16} /> User Management
+            <button onClick={() => setActiveTab('users')} className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${activeTab === 'users' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <ShieldCheck size={16} /> Access
             </button>
-            <button onClick={() => setActiveTab('warehouses')} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'warehouses' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            <button onClick={() => setActiveTab('warehouses')} className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${activeTab === 'warehouses' ? 'bg-white text-amber-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
               <Building2 size={16} /> Regions
             </button>
           </>
@@ -244,18 +244,21 @@ NOTIFY pgrst, 'reload config';
       </div>
 
       {activeTab === 'general' && (
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <div className="flex justify-between items-start mb-6">
-              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2"><Tag className="text-blue-600" size={24} /> Categories</h3>
+        <div className="bg-white p-6 md:p-8 rounded-[32px] shadow-sm border border-slate-100">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-3"><Tag className="text-blue-600" size={24} /> Taxonomy</h3>
+                <p className="text-xs text-slate-500 mt-1 font-medium">Manage categorization for the current regional warehouse.</p>
+              </div>
               {isSuperAdmin && (
-                <button onClick={() => setShowSchema(true)} className="flex items-center gap-2 text-[10px] font-black uppercase text-white bg-blue-600 px-4 py-2 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
+                <button onClick={() => setShowSchema(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 text-[10px] font-black uppercase text-white bg-blue-600 px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
                   <Database size={14} /> System SQL Repair (V4.2)
                 </button>
               )}
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); if(newCategory.trim()) { onAddCategory(newCategory.trim()); setNewCategory(''); }}} className="flex gap-3 mb-8">
-              <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New regional category..." className="flex-1 px-5 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all bg-slate-50/50" />
-              <button type="submit" className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all">Add Category</button>
+            <form onSubmit={(e) => { e.preventDefault(); if(newCategory.trim()) { onAddCategory(newCategory.trim()); setNewCategory(''); }}} className="flex flex-col sm:flex-row gap-3 mb-10">
+              <input type="text" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New regional category..." className="flex-1 px-5 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all bg-slate-50/50 text-sm" />
+              <button type="submit" className="bg-slate-900 text-white px-8 py-3.5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10">Add Category</button>
             </form>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {categories.map((category) => {
@@ -263,16 +266,17 @@ NOTIFY pgrst, 'reload config';
                 const isLocked = productCount > 0;
                 
                 return (
-                  <div key={category} className={`flex items-center justify-between p-4 bg-white border rounded-2xl transition-all group ${isLocked ? 'border-slate-100 opacity-80' : 'border-slate-100 hover:border-blue-200'}`}>
+                  <div key={category} className={`flex items-center justify-between p-5 bg-white border rounded-3xl transition-all group ${isLocked ? 'border-slate-50 opacity-70' : 'border-slate-100 hover:border-blue-200 shadow-sm'}`}>
                     <div className="flex flex-col">
-                        <span className="font-bold text-slate-700">{category}</span>
-                        <span className={`text-[10px] font-black uppercase flex items-center gap-1 mt-0.5 ${isLocked ? 'text-blue-600' : 'text-slate-400'}`}>
-                            <Package size={10} /> {productCount} {productCount === 1 ? 'Product' : 'Products'}
+                        <span className="font-black text-slate-800 tracking-tight">{category}</span>
+                        <span className={`text-[10px] font-black uppercase flex items-center gap-1.5 mt-1 ${isLocked ? 'text-blue-500' : 'text-slate-400'}`}>
+                            <Package size={10} /> {productCount} {productCount === 1 ? 'Asset' : 'Assets'}
                         </span>
                     </div>
                     <button 
                       onClick={() => onDeleteCategory(category)} 
-                      className={`transition-colors p-2 rounded-lg ${isLocked ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`}
+                      className={`transition-colors p-2.5 rounded-xl ${isLocked ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`}
+                      disabled={isLocked}
                       title={isLocked ? "Cannot delete category with products" : "Delete category"}
                     >
                       <Trash2 size={18} />
@@ -285,28 +289,29 @@ NOTIFY pgrst, 'reload config';
       )}
 
       {activeTab === 'warehouses' && isSuperAdmin && (
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-          <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><Building2 className="text-amber-600" size={28} /> Regional Hubs</h3>
-          <form onSubmit={handleCreateWarehouse} className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 items-end">
+        <div className="bg-white p-6 md:p-8 rounded-[32px] shadow-sm border border-slate-100">
+          <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3"><Building2 className="text-amber-600" size={28} /> Regional Hubs</h3>
+          <form onSubmit={handleCreateWarehouse} className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10 items-end">
             <div className="col-span-1">
               <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Region Name</label>
-              <input required type="text" value={newWhName} onChange={e => setNewWhName(e.target.value)} placeholder="e.g. Asia-Pacific" className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none bg-slate-50/50" />
+              <input required type="text" value={newWhName} onChange={e => setNewWhName(e.target.value)} placeholder="e.g. Asia-Pacific" className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm" />
             </div>
             <div className="col-span-1">
               <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Location Details</label>
-              <input type="text" value={newWhLoc} onChange={e => setNewWhLoc(e.target.value)} placeholder="e.g. Hong Kong, SAR" className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none bg-slate-50/50" />
+              <input type="text" value={newWhLoc} onChange={e => setNewWhLoc(e.target.value)} placeholder="e.g. Hong Kong, SAR" className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm" />
             </div>
             <button type="submit" className="bg-amber-600 text-white h-[52px] rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-amber-700 transition-all shadow-xl shadow-amber-500/20">Create Hub</button>
           </form>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {warehouses.map(wh => (
-              <div key={wh.id} className="p-6 bg-slate-50/50 border border-slate-100 rounded-3xl flex items-center justify-between hover:border-amber-200 transition-all">
+              <div key={wh.id} className="p-6 bg-slate-50/50 border border-slate-100 rounded-[28px] flex items-center justify-between hover:bg-white hover:border-amber-200 hover:shadow-lg hover:shadow-amber-500/5 transition-all">
                 <div>
-                  <h4 className="text-lg font-black text-slate-900">{wh.name}</h4>
-                  <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1"><MapPin size={12} className="text-amber-600" /> {wh.location || 'Global Location'}</p>
+                  <h4 className="text-lg font-black text-slate-900 leading-tight">{wh.name}</h4>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1.5 font-medium"><MapPin size={12} className="text-amber-600" /> {wh.location || 'Global Location'}</p>
                 </div>
-                <div className="text-right">
-                    <span className="text-[10px] bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-slate-400 font-mono shadow-sm">{wh.id.substring(0,8)}...</span>
+                <div className="text-right flex flex-col items-end gap-1">
+                    <span className="text-[9px] bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-slate-400 font-mono shadow-sm">{wh.id.substring(0,8)}</span>
+                    <span className="text-[9px] font-black uppercase text-slate-300">Region ID</span>
                 </div>
               </div>
             ))}
@@ -315,12 +320,12 @@ NOTIFY pgrst, 'reload config';
       )}
 
       {activeTab === 'users' && isSuperAdmin && (
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-          <h3 className="text-2xl font-black text-slate-900 mb-8 flex items-center gap-3"><ShieldCheck className="text-blue-600" size={28} /> Permissions</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+        <div className="bg-white p-6 md:p-8 rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+          <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3"><ShieldCheck className="text-blue-600" size={28} /> Access Control</h3>
+          <div className="overflow-x-auto -mx-6 md:mx-0">
+            <table className="w-full text-left min-w-[600px]">
               <thead>
-                <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
+                <tr className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-50">
                   <th className="px-6 py-4">Security Profile</th>
                   <th className="px-6 py-4">Role Designation</th>
                   <th className="px-6 py-4">Region Access Control</th>
@@ -330,19 +335,19 @@ NOTIFY pgrst, 'reload config';
               <tbody className="divide-y divide-slate-50">
                 {allUsers.map(user => (
                   <tr key={user.email} className="hover:bg-slate-50/50 transition-all">
-                    <td className="px-6 py-5">
-                      <div className="font-bold text-slate-900">{user.email}</div>
-                      {user.email === 'jhobo@grnesl.com' && <div className="text-[9px] text-blue-600 font-black uppercase mt-1">System Founder</div>}
+                    <td className="px-6 py-6">
+                      <div className="font-black text-slate-900">{user.email}</div>
+                      {user.email === 'jhobo@grnesl.com' && <div className="text-[9px] text-blue-600 font-black uppercase mt-1 tracking-tighter">System Founder</div>}
                     </td>
-                    <td className="px-6 py-5">
-                        <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase border ${user.role === 'super_admin' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                    <td className="px-6 py-6">
+                        <span className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase border ${user.role === 'super_admin' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20' : 'bg-white text-slate-500 border-slate-200'}`}>
                           {user.role.replace('_', ' ')}
                         </span>
                     </td>
-                    <td className="px-6 py-5">
+                    <td className="px-6 py-6">
                       {user.role === 'super_admin' ? (
                         <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100 w-fit">
-                            <Globe size={12} /> Global Master Access
+                            <Globe size={12} /> Master Account
                         </div>
                       ) : (
                         <div className="flex flex-wrap gap-2">
@@ -354,10 +359,10 @@ NOTIFY pgrst, 'reload config';
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-5 text-right">
+                    <td className="px-6 py-6 text-right">
                        {user.email !== 'jhobo@grnesl.com' && (
-                         <button onClick={() => toggleUserStatus(user.email, user.is_approved)} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${user.is_approved ? 'text-red-600 bg-red-50 hover:bg-red-100' : 'text-blue-600 bg-blue-50 hover:bg-blue-100'}`}>
-                           {user.is_approved ? 'Revoke Session' : 'Grant Entry'}
+                         <button onClick={() => toggleUserStatus(user.email, user.is_approved)} className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm ${user.is_approved ? 'text-red-600 bg-red-50 hover:bg-red-600 hover:text-white' : 'text-blue-600 bg-blue-50 hover:bg-blue-600 hover:text-white'}`}>
+                           {user.is_approved ? 'Revoke' : 'Grant'}
                          </button>
                        )}
                     </td>
@@ -370,14 +375,14 @@ NOTIFY pgrst, 'reload config';
       )}
 
       {activeTab === 'account' && (
-        <div className="max-w-md">
-          <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-            <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3"><Lock className="text-slate-500" size={24} /> Security</h3>
+        <div className="max-w-md mx-auto md:mx-0">
+          <div className="bg-white p-6 md:p-8 rounded-[32px] shadow-sm border border-slate-100">
+            <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3"><Lock className="text-slate-400" size={24} /> Security Key</h3>
             <form onSubmit={handlePasswordUpdate} className="space-y-6">
-              <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">New System Password</label><input type="password" required minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none bg-slate-50/50" /></div>
-              <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">Verify Password</label><input type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-5 py-3 border border-slate-200 rounded-2xl outline-none bg-slate-50/50" /></div>
-              {passwordMsg.text && <div className={`p-4 rounded-2xl text-xs font-bold ${passwordMsg.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{passwordMsg.text}</div>}
-              <button type="submit" className="w-full bg-slate-900 text-white font-black uppercase text-xs tracking-widest py-4 rounded-2xl hover:bg-slate-800 transition-all shadow-xl">Update Credentials</button>
+              <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">New System Password</label><input type="password" required minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm" /></div>
+              <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">Verify Password</label><input type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm" /></div>
+              {passwordMsg.text && <div className={`p-5 rounded-2xl text-xs font-bold shadow-sm ${passwordMsg.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>{passwordMsg.text}</div>}
+              <button type="submit" className="w-full bg-slate-900 text-white font-black uppercase text-xs tracking-widest py-4 rounded-2xl hover:bg-slate-800 transition-all shadow-xl">Update System Key</button>
             </form>
           </div>
         </div>
@@ -390,19 +395,19 @@ NOTIFY pgrst, 'reload config';
             <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <div>
-                        <h3 className="text-2xl font-black text-slate-900">Database Repair Terminal (V4.2)</h3>
-                        <p className="text-xs text-slate-500 mt-1 font-medium">Resolves 'uuid = uuid[]' errors using unnest() for scalar comparisons.</p>
+                        <h3 className="text-2xl font-black text-slate-900">Database Repair (V4.2)</h3>
+                        <p className="text-xs text-slate-500 mt-1 font-medium italic">Advanced scalar unnesting for robust RLS.</p>
                     </div>
-                    <button onClick={() => setShowSchema(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={24} /></button>
+                    <button onClick={() => setShowSchema(false)} className="p-2.5 hover:bg-slate-200 rounded-full transition-colors text-slate-400"><X size={24} /></button>
                 </div>
                 <div className="p-0 flex-1 bg-slate-900 overflow-auto">
                     <pre className="p-8 text-xs text-blue-300 font-mono leading-relaxed">{sqlSchema}</pre>
                 </div>
-                <div className="p-6 bg-slate-50 flex items-center justify-between border-t border-slate-200">
-                     <p className="text-[10px] font-bold text-slate-500 max-w-xs">Run this script in your Supabase SQL Editor to fix RLS comparison errors.</p>
-                     <div className="flex gap-3">
-                        <button onClick={() => { navigator.clipboard.writeText(sqlSchema); alert("SQL Migration script copied to clipboard!"); }} className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all">Copy Migration Script</button>
-                        <button onClick={() => setShowSchema(false)} className="px-6 py-3 bg-white text-slate-700 border border-slate-200 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50">Dismiss</button>
+                <div className="p-6 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200">
+                     <p className="text-[10px] font-bold text-slate-400 max-w-xs text-center sm:text-left">Copy and execute this script in the Supabase SQL Editor to secure the database.</p>
+                     <div className="flex gap-3 w-full sm:w-auto">
+                        <button onClick={() => { navigator.clipboard.writeText(sqlSchema); alert("SQL Migration script copied to clipboard!"); }} className="flex-1 sm:flex-none px-8 py-3.5 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all">Copy SQL</button>
+                        <button onClick={() => setShowSchema(false)} className="flex-1 sm:flex-none px-8 py-3.5 bg-white text-slate-700 border border-slate-200 font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-50">Dismiss</button>
                      </div>
                 </div>
             </div>
