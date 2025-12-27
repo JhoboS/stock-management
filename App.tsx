@@ -19,7 +19,7 @@ import {
 } from './services/storageService';
 import { supabase, isConfigured } from './services/supabaseClient';
 import { Product, Assignment, ScrappedItem, OperationType, Employee, AppUser, StockLog, Warehouse } from './types';
-import { Loader2, Database, AlertTriangle, Lock, XCircle, Building2, ChevronDown, Check } from 'lucide-react';
+import { Loader2, Database, AlertTriangle, Lock, XCircle, Building2, ChevronDown, Check, Layout } from 'lucide-react';
 
 const SUPER_ADMIN_EMAIL = 'jhobo@grnesl.com';
 
@@ -83,9 +83,22 @@ const App: React.FC = () => {
           setWarehouses(allWh);
 
           let appUser = await fetchAppUser(email);
-          if (!appUser && email === SUPER_ADMIN_EMAIL) {
-            appUser = { id: session.user.id, email, role: 'super_admin', is_approved: true, assigned_warehouses: [] };
-            await createAppUser(appUser);
+          
+          // CRITICAL: Self-healing logic for Super Admin
+          if (email === SUPER_ADMIN_EMAIL) {
+            const superAdminUser: AppUser = { 
+              id: session.user.id, 
+              email, 
+              role: 'super_admin', 
+              is_approved: true, 
+              assigned_warehouses: appUser?.assigned_warehouses || [] 
+            };
+            
+            // If user doesn't exist in our table yet, create them
+            if (!appUser) {
+              await createAppUser(superAdminUser);
+            }
+            appUser = superAdminUser;
           } else if (!appUser) {
             appUser = { id: session.user.id, email, role: 'user', is_approved: false, assigned_warehouses: [] };
             await createAppUser(appUser);
@@ -111,7 +124,7 @@ const App: React.FC = () => {
     if (activeWarehouseId && isApproved) {
         loadData();
     }
-  }, [activeWarehouseId]);
+  }, [activeWarehouseId, isApproved]);
 
   const handleError = (error: any) => {
     const msg = error.message || "Unknown error";
@@ -201,17 +214,21 @@ const App: React.FC = () => {
   const handleLogout = async () => { await supabase.auth.signOut(); };
 
   if (!session) return <Login />;
-  if (isLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4"><Loader2 className="animate-spin text-blue-600" size={48} /><p className="font-medium animate-pulse">Switching Warehouse...</p></div>;
+  
+  // Show loading during initialization
+  if (isLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4"><Loader2 className="animate-spin text-blue-600" size={48} /><p className="font-medium animate-pulse text-slate-600">Checking system access...</p></div>;
 
-  if (!isApproved || (currentUser?.role !== 'super_admin' && currentUser?.assigned_warehouses.length === 0)) {
+  // LOCKOUT LOGIC: Only lock out if NOT approved. 
+  // Super admins are self-healingly approved in useEffect.
+  if (!isApproved) {
      return (
         <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-10 text-center">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-xl p-10 text-center animate-fade-in">
                 <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6"><Lock size={40} /></div>
                 <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Restricted</h1>
-                <p className="text-slate-500 mb-6">Your account requires approval and at least one assigned warehouse to begin.</p>
-                <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-600 mb-6 font-medium">Contact Administrator (jhobo@grnesl.com)</div>
-                <button onClick={handleLogout} className="text-blue-600 hover:text-blue-800 font-bold">Sign Out</button>
+                <p className="text-slate-500 mb-6">Your account requires approval from the system owner to access the warehouse management system.</p>
+                <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-600 mb-6 font-medium">Contact System Owner: jhobo@grnesl.com</div>
+                <button onClick={handleLogout} className="text-blue-600 hover:text-blue-800 font-bold transition-colors">Sign Out and Try Again</button>
             </div>
         </div>
      );
@@ -219,7 +236,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 relative flex-col">
-      {schemaError && <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between shadow-md z-50"><div className="flex items-center gap-2 text-sm font-medium"><AlertTriangle size={18} />{schemaError}</div><button onClick={() => setCurrentView('settings')} className="bg-white text-red-600 px-3 py-1 rounded text-xs font-bold">Fix Schema</button></div>}
+      {schemaError && <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between shadow-md z-50"><div className="flex items-center gap-2 text-sm font-medium"><AlertTriangle size={18} />{schemaError}</div><button onClick={() => setCurrentView('settings')} className="bg-white text-red-600 px-3 py-1 rounded text-xs font-bold hover:bg-slate-100 transition-colors">Go to Settings</button></div>}
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar currentView={currentView} onViewChange={setCurrentView} />
@@ -229,44 +246,66 @@ const App: React.FC = () => {
                 <div>
                   <h2 className="text-2xl font-bold text-slate-800 capitalize">{currentView}</h2>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-slate-500">Managing:</span>
+                    <span className="text-xs text-slate-500 font-medium">Warehouse Context:</span>
                     <div className="relative">
-                        <button onClick={() => setIsWhMenuOpen(!isWhMenuOpen)} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1 rounded-lg text-sm font-bold text-blue-600 shadow-sm hover:border-blue-400 transition-all">
-                            <Building2 size={14} /> {activeWarehouse?.name || 'Select Warehouse'} <ChevronDown size={14} />
+                        <button onClick={() => setIsWhMenuOpen(!isWhMenuOpen)} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg text-sm font-bold text-blue-600 shadow-sm hover:border-blue-400 transition-all">
+                            <Building2 size={14} /> {activeWarehouse?.name || 'Create First Warehouse'} <ChevronDown size={14} />
                         </button>
                         {isWhMenuOpen && (
-                            <div className="absolute top-full left-0 mt-2 w-56 bg-white border rounded-xl shadow-xl z-50 overflow-hidden py-1 animate-fade-in">
-                                <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-400 border-b mb-1">Your Assigned Warehouses</div>
+                            <div className="absolute top-full left-0 mt-2 w-64 bg-white border rounded-xl shadow-xl z-50 overflow-hidden py-1 animate-fade-in ring-1 ring-black/5">
+                                <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-400 border-b mb-1">Select Active Region</div>
                                 {userWarehouses.map(wh => (
                                     <button 
                                         key={wh.id} 
                                         onClick={() => { setActiveWarehouseId(wh.id); setIsWhMenuOpen(false); }}
-                                        className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-50 ${activeWarehouseId === wh.id ? 'text-blue-600 font-bold bg-blue-50' : 'text-slate-600'}`}
+                                        className={`w-full text-left px-4 py-2.5 text-sm flex items-center justify-between hover:bg-slate-50 transition-colors ${activeWarehouseId === wh.id ? 'text-blue-600 font-bold bg-blue-50' : 'text-slate-600'}`}
                                     >
-                                        {wh.name}
+                                        <span className="flex items-center gap-2 truncate"><Building2 size={14} className="opacity-40" /> {wh.name}</span>
                                         {activeWarehouseId === wh.id && <Check size={14} />}
                                     </button>
                                 ))}
-                                {userWarehouses.length === 0 && <div className="p-4 text-xs text-slate-400 italic">No warehouses found.</div>}
+                                {userWarehouses.length === 0 && (
+                                  <div className="p-4 text-center">
+                                    <p className="text-xs text-slate-400 italic mb-2">No warehouses found.</p>
+                                    <button onClick={() => { setCurrentView('settings'); setIsWhMenuOpen(false); }} className="text-[10px] text-blue-600 font-bold uppercase hover:underline">Add in Settings</button>
+                                  </div>
+                                )}
                             </div>
                         )}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   <div className="text-right hidden sm:block">
-                    <p className="text-sm font-medium text-slate-900">{session.user.email}</p>
-                    <button onClick={handleLogout} className="text-xs text-red-500 font-medium">Sign Out</button>
+                    <p className="text-sm font-bold text-slate-900">{session.user.email}</p>
+                    <div className="flex items-center gap-2 justify-end">
+                      <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded uppercase">{currentUser?.role.replace('_', ' ')}</span>
+                      <button onClick={handleLogout} className="text-[10px] text-red-500 font-bold uppercase hover:underline">Sign Out</button>
+                    </div>
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border-2 border-white shadow-sm">{session.user.email?.substring(0,2).toUpperCase()}</div>
+                  <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold border-2 border-white shadow-md select-none">{session.user.email?.substring(0,2).toUpperCase()}</div>
                 </div>
             </header>
 
-            {currentView === 'dashboard' && <Dashboard products={products} />}
-            {currentView === 'inventory' && <Inventory products={products} categories={categories} assignments={assignments} scrappedItems={scrappedItems} logs={stockLogs} onAddProduct={() => { setEditingProduct(undefined); setIsProductModalOpen(true); }} onEditProduct={(p) => { setEditingProduct(p); setIsProductModalOpen(true); }} onDeleteProduct={deleteProductApi} onInbound={() => { setStockOpType('INBOUND'); setSelectedStockProduct(undefined); setIsStockOpModalOpen(true); }} onAssign={(p) => { setStockOpType('ASSIGN'); setSelectedStockProduct(p); setIsStockOpModalOpen(true); }} onScrap={(p) => { setStockOpType('SCRAP'); setSelectedStockProduct(p); setIsStockOpModalOpen(true); }} />}
-            {currentView === 'employees' && <Employees employees={employees} assignments={assignments} onAddEmployee={handleAddEmployee} onReturnAsset={handleReturnAsset} />}
-            {currentView === 'logs' && <Logs logs={stockLogs} />}
-            {currentView === 'settings' && <Settings categories={categories} products={products} assignments={assignments} employees={employees} scrappedItems={scrappedItems} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} onImportData={() => {}} currentUser={currentUser} activeWarehouseId={activeWarehouseId} />}
+            {!activeWarehouseId && currentUser?.role === 'super_admin' && currentView !== 'settings' ? (
+               <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-20 text-center animate-slide-up">
+                  <Building2 size={64} className="mx-auto text-slate-300 mb-6" />
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">Welcome to Great River System</h3>
+                  <p className="text-slate-500 mb-8 max-w-sm mx-auto">As the Super Admin, your first step is to create a warehouse region in the settings.</p>
+                  <button onClick={() => setCurrentView('settings')} className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2 mx-auto">
+                    <Layout size={20} />
+                    Go to Settings
+                  </button>
+               </div>
+            ) : (
+              <>
+                {currentView === 'dashboard' && <Dashboard products={products} />}
+                {currentView === 'inventory' && <Inventory products={products} categories={categories} assignments={assignments} scrappedItems={scrappedItems} logs={stockLogs} onAddProduct={() => { setEditingProduct(undefined); setIsProductModalOpen(true); }} onEditProduct={(p) => { setEditingProduct(p); setIsProductModalOpen(true); }} onDeleteProduct={deleteProductApi} onInbound={() => { setStockOpType('INBOUND'); setSelectedStockProduct(undefined); setIsStockOpModalOpen(true); }} onAssign={(p) => { setStockOpType('ASSIGN'); setSelectedStockProduct(p); setIsStockOpModalOpen(true); }} onScrap={(p) => { setStockOpType('SCRAP'); setSelectedStockProduct(p); setIsStockOpModalOpen(true); }} />}
+                {currentView === 'employees' && <Employees employees={employees} assignments={assignments} onAddEmployee={handleAddEmployee} onReturnAsset={handleReturnAsset} />}
+                {currentView === 'logs' && <Logs logs={stockLogs} />}
+                {currentView === 'settings' && <Settings categories={categories} products={products} assignments={assignments} employees={employees} scrappedItems={scrappedItems} onAddCategory={handleAddCategory} onDeleteCategory={handleDeleteCategory} onImportData={() => {}} currentUser={currentUser} activeWarehouseId={activeWarehouseId} />}
+              </>
+            )}
             </div>
         </main>
       </div>
