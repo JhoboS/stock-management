@@ -336,7 +336,19 @@ const App: React.FC = () => {
                     } catch (err: any) {
                         alert(`Error adding category: ${err.message}. If this is a duplicate name error, please go to Settings > General and click 'System SQL Repair' to fix regional independence.`);
                     }
-                }} onDeleteCategory={(c) => deleteCategoryApi(c, activeWarehouseId).then(loadData)} onImportData={() => {}} currentUser={currentUser} activeWarehouseId={activeWarehouseId} />}
+                }} onDeleteCategory={async (c) => {
+                    const productCount = products.filter(p => p.category === c).length;
+                    if (productCount > 0) {
+                      alert(`Cannot delete category "${c}" because there are ${productCount} products assigned to it. Move or delete these products first.`);
+                      return;
+                    }
+                    try {
+                      await deleteCategoryApi(c, activeWarehouseId);
+                      await loadData();
+                    } catch (err: any) {
+                      alert(`Failed to delete category: ${err.message}`);
+                    }
+                }} onImportData={() => {}} currentUser={currentUser} activeWarehouseId={activeWarehouseId} />}
               </div>
             )}
             </div>

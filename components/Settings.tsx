@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Tag, BrainCircuit, UserCog, ShieldCheck, X, Lock, Database, MapPin, Building2, Globe } from 'lucide-react';
+import { Plus, Trash2, Tag, BrainCircuit, UserCog, ShieldCheck, X, Lock, Database, MapPin, Building2, Globe, Package } from 'lucide-react';
 import AIAdvisor from './AIAdvisor';
 import { Product, Assignment, ScrappedItem, Employee, AppUser, Warehouse } from '../types';
 import { supabase } from '../services/supabaseClient';
@@ -257,12 +257,28 @@ NOTIFY pgrst, 'reload config';
               <button type="submit" className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all">Add Category</button>
             </form>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {categories.map((category) => (
-                <div key={category} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-blue-200 transition-all group">
-                  <span className="font-bold text-slate-700">{category}</span>
-                  <button onClick={() => onDeleteCategory(category)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
-                </div>
-              ))}
+              {categories.map((category) => {
+                const productCount = products.filter(p => p.category === category).length;
+                const isLocked = productCount > 0;
+                
+                return (
+                  <div key={category} className={`flex items-center justify-between p-4 bg-white border rounded-2xl transition-all group ${isLocked ? 'border-slate-100 opacity-80' : 'border-slate-100 hover:border-blue-200'}`}>
+                    <div className="flex flex-col">
+                        <span className="font-bold text-slate-700">{category}</span>
+                        <span className={`text-[10px] font-black uppercase flex items-center gap-1 mt-0.5 ${isLocked ? 'text-blue-600' : 'text-slate-400'}`}>
+                            <Package size={10} /> {productCount} {productCount === 1 ? 'Product' : 'Products'}
+                        </span>
+                    </div>
+                    <button 
+                      onClick={() => onDeleteCategory(category)} 
+                      className={`transition-colors p-2 rounded-lg ${isLocked ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-red-500 hover:bg-red-50'}`}
+                      title={isLocked ? "Cannot delete category with products" : "Delete category"}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
         </div>
       )}
