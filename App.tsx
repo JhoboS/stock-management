@@ -176,7 +176,21 @@ const App: React.FC = () => {
 
   const handleSaveProduct = async (product: Product) => {
     try {
+      const isNew = !products.find(p => p.id === product.id);
       await upsertProduct({ ...product, warehouseId: activeWarehouseId });
+      
+      // Log the creation or update event
+      await addStockLogApi({
+        id: crypto.randomUUID(),
+        warehouseId: activeWarehouseId,
+        action: isNew ? 'CREATE' : 'UPDATE',
+        productName: product.name,
+        quantity: product.quantity,
+        performedBy: session.user.email,
+        date: new Date().toISOString(),
+        details: isNew ? `Initial creation with ${product.quantity} units.` : 'Metadata or stock updated via editor.'
+      });
+
       await loadData();
     } catch (error: any) { 
         alert(`Failed: ${error.message}. If this is a SKU/Name duplicate error across regions, please run the SQL Repair in Settings.`); 
