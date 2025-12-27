@@ -19,7 +19,7 @@ import {
 } from './services/storageService';
 import { supabase, isConfigured } from './services/supabaseClient';
 import { Product, Assignment, ScrappedItem, OperationType, Employee, AppUser, StockLog, Warehouse } from './types';
-import { Loader2, AlertTriangle, Lock, Building2, ChevronDown, Check, Layout, ShieldCheck } from 'lucide-react';
+import { Loader2, AlertTriangle, Lock, Building2, ChevronDown, Check, Layout, ShieldCheck, Menu } from 'lucide-react';
 
 const SUPER_ADMIN_EMAIL = 'jhobo@grnesl.com';
 const DEFAULT_WH_ID = '00000000-0000-0000-0000-000000000000';
@@ -30,6 +30,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Multi-Warehouse State
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
@@ -83,7 +84,6 @@ const App: React.FC = () => {
         setIsLoading(true);
         const email = session.user.email;
         
-        // 1. HARDCODED IMMEDIATE BYPASS for Super Admin
         if (email === SUPER_ADMIN_EMAIL) {
           setIsApproved(true);
           const adminProfile: AppUser = {
@@ -97,7 +97,6 @@ const App: React.FC = () => {
         }
 
         try {
-          // 2. Load Warehouses
           let allWh: Warehouse[] = [];
           try {
             allWh = await fetchWarehouses();
@@ -106,7 +105,6 @@ const App: React.FC = () => {
             if (isSuperAdminUser) setSchemaError("Database initialization required. Run SQL Repair in Settings.");
           }
 
-          // 3. Load App User Profile (Non-blocking for Super Admin)
           let appUser = await fetchAppUser(email);
           
           if (isSuperAdminUser) {
@@ -115,7 +113,7 @@ const App: React.FC = () => {
                 const superAdminRecord: AppUser = { id: session.user.id, email, role: 'super_admin', is_approved: true, assigned_warehouses: [] };
                 await createAppUser(superAdminRecord);
                 appUser = superAdminRecord;
-              } catch (e) { /* DB might be missing tables, handled by schemaError */ }
+              } catch (e) {}
             }
           } else if (!appUser) {
             appUser = { id: session.user.id, email, role: 'user', is_approved: false, assigned_warehouses: [] };
@@ -124,18 +122,15 @@ const App: React.FC = () => {
 
           if (appUser) setCurrentUser(appUser);
           
-          // 4. Determine Initial Warehouse Context
           if (appUser?.is_approved || isSuperAdminUser) {
             setIsApproved(true);
-            
-            // Prioritize US Warehouse if it exists, otherwise use first available
             const usWh = allWh.find(w => w.id === DEFAULT_WH_ID);
             const initialWhId = usWh ? usWh.id : (appUser?.role === 'super_admin' ? allWh[0]?.id : appUser?.assigned_warehouses[0]);
             
             if (initialWhId) {
               setActiveWarehouseId(initialWhId);
             } else if (isSuperAdminUser) {
-              setCurrentView('settings'); // Force settings to create first region
+              setCurrentView('settings');
             }
           }
         } catch (error) {
@@ -178,8 +173,6 @@ const App: React.FC = () => {
     try {
       const isNew = !products.find(p => p.id === product.id);
       await upsertProduct({ ...product, warehouseId: activeWarehouseId });
-      
-      // Log the creation or update event
       await addStockLogApi({
         id: crypto.randomUUID(),
         warehouseId: activeWarehouseId,
@@ -190,10 +183,9 @@ const App: React.FC = () => {
         date: new Date().toISOString(),
         details: isNew ? `Initial creation with ${product.quantity} units.` : 'Metadata or stock updated via editor.'
       });
-
       await loadData();
     } catch (error: any) { 
-        alert(`Failed: ${error.message}. If this is a SKU/Name duplicate error across regions, please run the SQL Repair in Settings.`); 
+        alert(`Failed: ${error.message}`); 
     }
   };
 
@@ -255,72 +247,85 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 relative flex-col">
+    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 flex-col">
       {schemaError && (
-        <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between shadow-lg z-[100] sticky top-0 animate-fade-in">
+        <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between shadow-lg z-[150] sticky top-0 animate-fade-in">
           <div className="flex items-center gap-3 text-sm font-bold">
             <AlertTriangle size={20} className="animate-pulse" />
-            <span>{schemaError}</span>
+            <span className="truncate">{schemaError}</span>
           </div>
-          <button onClick={() => { setCurrentView('settings'); setSchemaError(null); }} className="bg-white text-red-600 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider hover:bg-slate-100 shadow-sm transition-all">Resolve Schema</button>
+          <button onClick={() => { setCurrentView('settings'); setSchemaError(null); }} className="bg-white text-red-600 px-3 py-1 rounded-lg text-xs font-black hover:bg-slate-100 transition-all ml-4 flex-shrink-0">Resolve</button>
         </div>
       )}
 
+      {/* Mobile Top Nav */}
+      <div className="md:hidden bg-slate-900 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+        <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors">
+          <Menu size={24} />
+        </button>
+        <span className="font-black tracking-tight text-sm uppercase">Great River</span>
+        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-xs font-black">
+          {session.user.email?.substring(0,1).toUpperCase()}
+        </div>
+      </div>
+
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar currentView={currentView} onViewChange={setCurrentView} />
-        <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen bg-slate-50/50">
+        <Sidebar 
+          currentView={currentView} 
+          onViewChange={setCurrentView} 
+          isOpen={isSidebarOpen} 
+          onClose={() => setIsSidebarOpen(false)} 
+        />
+        
+        {/* Dynamic margin based on responsive breakpoint */}
+        <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto h-[calc(100vh-64px)] md:h-screen bg-slate-50/50 transition-all duration-300">
             <div className="max-w-7xl mx-auto">
-            <header className="mb-8 flex justify-between items-center">
+            <header className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900 capitalize tracking-tight">{currentView}</h2>
+                  <h2 className="text-xl md:text-2xl font-black text-slate-900 capitalize tracking-tight">{currentView}</h2>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Region Context</span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Region</span>
                     <div className="relative">
-                        <button onClick={() => setIsWhMenuOpen(!isWhMenuOpen)} className="flex items-center gap-2.5 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs font-bold text-blue-600 shadow-sm hover:border-blue-300 transition-all">
-                            <Building2 size={14} className="opacity-70" /> 
-                            {activeWarehouse?.name || (isSuperAdminUser ? 'Setup Required' : 'Selecting...')} 
-                            <ChevronDown size={14} className={`transition-transform ${isWhMenuOpen ? 'rotate-180' : ''}`} />
+                        <button onClick={() => setIsWhMenuOpen(!isWhMenuOpen)} className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-[11px] md:text-xs font-bold text-blue-600 shadow-sm hover:border-blue-300 transition-all">
+                            <Building2 size={12} className="opacity-70" /> 
+                            {activeWarehouse?.name || (isSuperAdminUser ? 'Setup' : '...')} 
+                            <ChevronDown size={12} className={`transition-transform ${isWhMenuOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {isWhMenuOpen && (
-                            <div className="absolute top-full left-0 mt-2 w-64 bg-white border rounded-2xl shadow-2xl z-[110] overflow-hidden py-2 animate-fade-in">
+                            <div className="absolute top-full left-0 mt-2 w-56 md:w-64 bg-white border rounded-2xl shadow-2xl z-[110] overflow-hidden py-2 animate-fade-in">
                                 {userWarehouses.map(wh => (
                                     <button key={wh.id} onClick={() => { setActiveWarehouseId(wh.id); setIsWhMenuOpen(false); }} className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between hover:bg-blue-50 ${activeWarehouseId === wh.id ? 'text-blue-600 font-bold bg-blue-50' : 'text-slate-600'}`}>
-                                        <span className="flex items-center gap-3 truncate"><Building2 size={14} className="opacity-40" /> {wh.name}</span>
+                                        <span className="flex items-center gap-3 truncate text-xs"><Building2 size={14} className="opacity-40" /> {wh.name}</span>
                                         {activeWarehouseId === wh.id && <Check size={16} strokeWidth={3} />}
                                     </button>
                                 ))}
-                                {userWarehouses.length === 0 && (
-                                  <div className="p-4 text-center">
-                                    <p className="text-xs text-slate-400 italic mb-2">No regions found.</p>
-                                    {isSuperAdminUser && <button onClick={() => { setCurrentView('settings'); setIsWhMenuOpen(false); }} className="text-xs text-blue-600 font-bold uppercase hover:underline">Create First Region</button>}
-                                  </div>
-                                )}
                             </div>
                         )}
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-5">
-                  <div className="text-right hidden sm:block">
+                
+                <div className="hidden sm:flex items-center gap-5">
+                  <div className="text-right">
                     <p className="text-sm font-black text-slate-900">{session.user.email}</p>
                     <div className="flex items-center gap-2 justify-end mt-0.5">
-                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${isSuperAdminUser ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{isSuperAdminUser ? 'System Owner' : currentUser?.role.replace('_', ' ')}</span>
-                      <button onClick={handleLogout} className="text-[9px] text-red-500 font-black uppercase hover:underline">Sign Out</button>
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${isSuperAdminUser ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{isSuperAdminUser ? 'Owner' : 'Staff'}</span>
+                      <button onClick={handleLogout} className="text-[9px] text-red-500 font-black uppercase hover:underline">Exit</button>
                     </div>
                   </div>
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-lg shadow-xl shadow-blue-500/20 ring-4 ring-white select-none">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-lg shadow-xl ring-4 ring-white select-none">
                     {isSuperAdminUser ? <ShieldCheck size={24} /> : session.user.email?.substring(0,1).toUpperCase()}
                   </div>
                 </div>
             </header>
 
             {!activeWarehouseId && isSuperAdminUser && currentView !== 'settings' ? (
-               <div className="bg-white border border-slate-200 rounded-3xl p-16 text-center animate-slide-up shadow-sm">
-                  <Building2 size={64} className="mx-auto text-blue-100 mb-6" />
-                  <h3 className="text-2xl font-black text-slate-900 mb-3 tracking-tight">System Initialization Required</h3>
-                  <p className="text-slate-500 mb-10 max-w-sm mx-auto leading-relaxed">As the System Owner, you must initialize the database and regions before managing stock. Old data will be migrated to the default US Warehouse.</p>
-                  <button onClick={() => setCurrentView('settings')} className="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 shadow-2xl transition-all flex items-center gap-3 mx-auto">
-                    <Layout size={18} /> Open Configuration
+               <div className="bg-white border border-slate-200 rounded-3xl p-8 md:p-16 text-center animate-slide-up shadow-sm">
+                  <Building2 size={48} className="mx-auto text-blue-100 mb-4" />
+                  <h3 className="text-xl font-black text-slate-900 mb-2">Initialization Required</h3>
+                  <p className="text-slate-500 mb-8 max-w-sm mx-auto text-sm">Welcome! Please setup your first regional warehouse to begin.</p>
+                  <button onClick={() => setCurrentView('settings')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-slate-800 transition-all mx-auto">
+                    Setup System
                   </button>
                </div>
             ) : (
@@ -334,19 +339,19 @@ const App: React.FC = () => {
                         await addCategoryApi(c, activeWarehouseId);
                         await loadData();
                     } catch (err: any) {
-                        alert(`Error adding category: ${err.message}. If this is a duplicate name error, please go to Settings > General and click 'System SQL Repair' to fix regional independence.`);
+                        alert(`Error: ${err.message}`);
                     }
                 }} onDeleteCategory={async (c) => {
                     const productCount = products.filter(p => p.category === c).length;
                     if (productCount > 0) {
-                      alert(`Cannot delete category "${c}" because there are ${productCount} products assigned to it. Move or delete these products first.`);
+                      alert(`Error: ${productCount} products still in this category.`);
                       return;
                     }
                     try {
                       await deleteCategoryApi(c, activeWarehouseId);
                       await loadData();
                     } catch (err: any) {
-                      alert(`Failed to delete category: ${err.message}`);
+                      alert(`Failed: ${err.message}`);
                     }
                 }} onImportData={() => {}} currentUser={currentUser} activeWarehouseId={activeWarehouseId} />}
               </div>
