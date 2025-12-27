@@ -239,10 +239,10 @@ NOTIFY pgrst, 'reload config';
     <div className="space-y-6 animate-fade-in max-w-6xl">
        <div className="flex space-x-1 bg-slate-100 p-1.5 rounded-2xl w-full sm:w-fit mb-6 overflow-x-auto no-scrollbar scroll-smooth">
         <button onClick={() => setActiveTab('general')} className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${activeTab === 'general' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <Tag size={16} /> General
+          <Tag size={16} /> Category
         </button>
         <button onClick={() => setActiveTab('account')} className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${activeTab === 'account' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-          <UserCog size={16} /> Security
+          <UserCog size={16} /> Password
         </button>
         <button onClick={() => setActiveTab('advisor')} className={`flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all ${activeTab === 'advisor' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
           <BrainCircuit size={16} /> AI Assistant
@@ -263,7 +263,7 @@ NOTIFY pgrst, 'reload config';
         <div className="bg-white p-6 md:p-8 rounded-[32px] shadow-sm border border-slate-100">
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8">
               <div>
-                <h3 className="text-xl font-black text-slate-900 flex items-center gap-3"><Tag className="text-blue-600" size={24} /> Taxonomy</h3>
+                <h3 className="text-xl font-black text-slate-900 flex items-center gap-3"><Tag className="text-blue-600" size={24} /> Category Settings</h3>
                 <p className="text-xs text-slate-500 mt-1 font-medium">Manage categorization for the current regional warehouse.</p>
               </div>
               {isSuperAdmin && (
@@ -393,12 +393,12 @@ NOTIFY pgrst, 'reload config';
       {activeTab === 'account' && (
         <div className="max-w-md mx-auto md:mx-0">
           <div className="bg-white p-6 md:p-8 rounded-[32px] shadow-sm border border-slate-100">
-            <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3"><Lock className="text-slate-400" size={24} /> Security Key</h3>
+            <h3 className="text-xl font-black text-slate-900 mb-8 flex items-center gap-3"><Lock className="text-slate-400" size={24} /> Password Settings</h3>
             <form onSubmit={handlePasswordUpdate} className="space-y-6">
               <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">New System Password</label><input type="password" required minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm" /></div>
               <div><label className="block text-[10px] font-black uppercase text-slate-400 mb-2 ml-1">Verify Password</label><input type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm" /></div>
               {passwordMsg.text && <div className={`p-5 rounded-2xl text-xs font-bold shadow-sm ${passwordMsg.type === 'error' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>{passwordMsg.text}</div>}
-              <button type="submit" className="w-full bg-slate-900 text-white font-black uppercase text-xs tracking-widest py-4 rounded-2xl hover:bg-slate-800 transition-all shadow-xl">Update System Key</button>
+              <button type="submit" className="w-full bg-slate-900 text-white font-black uppercase text-xs tracking-widest py-4 rounded-2xl hover:bg-slate-800 transition-all shadow-xl">Update Password</button>
             </form>
           </div>
         </div>

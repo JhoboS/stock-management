@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Product, Assignment, ScrappedItem, StockLog } from '../types';
-import { Edit, Trash2, Search, Filter, Plus, AlertCircle, ArrowDownCircle, UserPlus, Database, Package, Box } from 'lucide-react';
+import { Edit, Trash2, Search, Filter, Plus, AlertCircle, ArrowDownCircle, UserPlus, Package, Box } from 'lucide-react';
 
 interface InventoryProps {
   products: Product[];
@@ -32,6 +32,8 @@ const Inventory: React.FC<InventoryProps> = ({
     const matchesCategory = filterCategory === 'All' || product.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const buttonClass = "flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-700 px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-slate-50 transition-all shadow-sm";
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -67,24 +69,18 @@ const Inventory: React.FC<InventoryProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-            <button 
-              onClick={onInbound}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-100 px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-emerald-100 transition-all"
-            >
-              <ArrowDownCircle size={16} />
+            <button onClick={onInbound} className={buttonClass}>
+              <ArrowDownCircle size={16} className="text-emerald-500" />
               Inbound
             </button>
-            <button 
-              onClick={onAddProduct}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/25"
-            >
-              <Plus size={16} />
+            <button onClick={onAddProduct} className={buttonClass}>
+              <Plus size={16} className="text-blue-600" />
               New Product
             </button>
         </div>
       </div>
 
-      {/* Mobile-Optimized Card View (Visible only on small screens) */}
+      {/* Mobile-Optimized Card View */}
       <div className="grid grid-cols-1 gap-4 md:hidden">
         {filteredProducts.map((product) => {
           const isLowStock = product.quantity <= product.minStock;
@@ -121,7 +117,7 @@ const Inventory: React.FC<InventoryProps> = ({
         })}
       </div>
 
-      {/* Desktop Table View (Hidden on mobile) */}
+      {/* Desktop Table View */}
       <div className="hidden md:block bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -155,36 +151,31 @@ const Inventory: React.FC<InventoryProps> = ({
                   return (
                     <tr key={product.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-8 py-5">
-                        <div className="flex items-center gap-4">
-                           <div className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                              <Box size={20} />
-                           </div>
-                           <div>
-                              <div className="font-black text-slate-900 leading-none">{product.name}</div>
-                              <div className="text-xs text-slate-400 mt-1 font-medium">{product.nameZh}</div>
-                              <div className="flex items-center gap-2 mt-1.5">
-                                   <span className="text-[9px] font-black uppercase tracking-tighter text-slate-400">SKU: {product.sku}</span>
-                                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase bg-white border border-slate-200 text-slate-500">
-                                      {product.category}
-                                   </span>
-                              </div>
+                        <div className="flex flex-col">
+                           <div className="font-black text-slate-900 leading-none">{product.name}</div>
+                           <div className="text-xs text-slate-400 mt-1 font-medium">{product.nameZh}</div>
+                           <div className="flex items-center gap-2 mt-1.5">
+                                <span className="text-[9px] font-black uppercase tracking-tighter text-slate-400">SKU: {product.sku}</span>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase bg-white border border-slate-200 text-slate-500">
+                                   {product.category}
+                                </span>
                            </div>
                         </div>
                       </td>
                       
-                      <td className="px-6 py-5 text-center text-xs font-black text-emerald-600">
+                      <td className="px-6 py-5 text-center text-sm font-black text-emerald-600">
                         {totalInbound > 0 ? `+${totalInbound}` : '-'}
                       </td>
-                      <td className="px-6 py-5 text-center text-xs font-black text-blue-600">
+                      <td className="px-6 py-5 text-center text-sm font-black text-blue-600">
                         {activeAssigned > 0 ? activeAssigned : '-'}
                       </td>
-                      <td className="px-6 py-5 text-center text-xs font-black text-red-400">
+                      <td className="px-6 py-5 text-center text-sm font-black text-red-400">
                         {totalScrapped > 0 ? totalScrapped : '-'}
                       </td>
 
                       <td className="px-8 py-5 text-center">
                          <div className="flex flex-col items-center">
-                            <span className={`font-mono font-black text-xl ${isLowStock ? 'text-red-500' : 'text-slate-900'}`}>{product.quantity}</span>
+                            <span className={`font-mono font-black text-sm ${isLowStock ? 'text-red-500' : 'text-slate-900'}`}>{product.quantity}</span>
                             {isLowStock && (
                                 <span className="inline-flex items-center gap-1 text-red-500 text-[9px] font-black uppercase mt-1">
                                     <AlertCircle size={10} /> CRITICAL

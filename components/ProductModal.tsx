@@ -10,7 +10,6 @@ interface ProductModalProps {
   onSave: (product: Product) => void;
   categories: string[];
   product?: Product;
-  // Added warehouseId to match the Product interface requirements
   warehouseId: string;
 }
 
@@ -66,9 +65,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
     e.preventDefault();
     if (!formData.name || !formData.nameZh || !formData.sku) return;
     
-    // Fix: Include warehouseId to satisfy the required property in the Product type
     const newProduct: Product = {
-      // Use crypto.randomUUID() for DB compatibility (vs legacy Date.now string)
       id: product?.id || crypto.randomUUID(),
       warehouseId: product?.warehouseId || warehouseId,
       name: formData.name!,
@@ -86,21 +83,24 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in md:p-4">
+      <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col h-full md:h-auto max-h-[100vh] md:max-h-[90vh]">
         
-        <div className="flex items-center justify-between p-6 border-b border-slate-100">
-          <h2 className="text-xl font-bold text-slate-900">{product ? 'Edit Product' : 'Add New Product'}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+        <div className="flex items-center justify-between p-6 md:p-8 border-b border-slate-50 bg-slate-50/30">
+          <div>
+            <h2 className="text-xl md:text-2xl font-black text-slate-900">{product ? 'Update Asset' : 'New Asset Entry'}</h2>
+            <p className="text-xs text-slate-500 font-medium mt-1">Configure your product parameters in the system.</p>
+          </div>
+          <button onClick={onClose} className="p-2.5 hover:bg-slate-200 rounded-full transition-colors text-slate-400">
             <X size={24} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="p-6 md:p-8 overflow-y-auto space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
             
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Product Name (English) {product && <span className="text-xs text-slate-400 font-normal">(Read Only)</span>}</label>
+            <div className="col-span-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Label (EN)</label>
               <input
                 type="text"
                 name="name"
@@ -108,13 +108,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
                 onChange={handleChange}
                 required
                 readOnly={!!product}
-                className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${product ? 'bg-slate-100 text-slate-500' : 'bg-white'}`}
-                placeholder="e.g. Wireless Headphones"
+                className={`w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all bg-slate-50/50 text-sm font-medium ${product ? 'opacity-50' : ''}`}
+                placeholder="e.g. Server Rack A1"
               />
             </div>
 
-            <div className="col-span-2 md:col-span-1">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Product Name (Chinese) {product && <span className="text-xs text-slate-400 font-normal">(Read Only)</span>}</label>
+            <div className="col-span-1">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Label (ZH)</label>
               <input
                 type="text"
                 name="nameZh"
@@ -122,13 +122,13 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
                 onChange={handleChange}
                 required
                 readOnly={!!product}
-                className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${product ? 'bg-slate-100 text-slate-500' : 'bg-white'}`}
-                placeholder="e.g. 无线耳机"
+                className={`w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all bg-slate-50/50 text-sm font-medium ${product ? 'opacity-50' : ''}`}
+                placeholder="e.g. 服务器机架"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">SKU {product && <span className="text-xs text-slate-400 font-normal">(Read Only)</span>}</label>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Stock ID / SKU</label>
               <input
                 type="text"
                 name="sku"
@@ -136,18 +136,18 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
                 onChange={handleChange}
                 required
                 readOnly={!!product}
-                className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${product ? 'bg-slate-100 text-slate-500' : 'bg-white'}`}
-                placeholder="e.g. ELEC-001"
+                className={`w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all bg-slate-50/50 text-sm font-mono ${product ? 'opacity-50' : ''}`}
+                placeholder="SKU-XXXXX"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Category</label>
               <select
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm font-bold appearance-none"
               >
                 {categories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -155,24 +155,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Unit Price ($)</label>
-              <input
-                type="number"
-                name="price"
-                min="0"
-                step="0.01"
-                value={formData.price}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 col-span-1 md:col-span-2">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Quantity {product && <span className="text-xs text-slate-400 font-normal">(Read Only)</span>}
-                </label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Initial Qty</label>
                 <input
                   type="number"
                   name="quantity"
@@ -180,33 +165,33 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
                   value={formData.quantity}
                   onChange={handleChange}
                   readOnly={!!product}
-                  className={`w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none ${product ? 'bg-slate-100 text-slate-500' : 'bg-white'}`}
+                  className={`w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm font-black ${product ? 'opacity-50' : ''}`}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Min Stock</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Min. Threshold</label>
                 <input
                   type="number"
                   name="minStock"
                   min="0"
                   value={formData.minStock}
                   onChange={handleChange}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                  className="w-full px-5 py-3.5 border border-slate-200 rounded-2xl outline-none bg-slate-50/50 text-sm font-black text-red-500"
                 />
               </div>
             </div>
 
-            <div className="col-span-2">
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-slate-700">Description</label>
+            <div className="col-span-1 md:col-span-2">
+              <div className="flex items-center justify-between mb-2 ml-1">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400">Technical Details</label>
                 <button
                   type="button"
                   onClick={handleGenerateDescription}
                   disabled={isGenerating || !formData.name}
-                  className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-indigo-600 hover:text-indigo-700 disabled:opacity-30"
                 >
                   {isGenerating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                  Generate with AI
+                  AI Auto-Fill
                 </button>
               </div>
               <textarea
@@ -214,25 +199,25 @@ const ProductModal: React.FC<ProductModalProps> = ({ isOpen, onClose, onSave, ca
                 rows={3}
                 value={formData.description}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none bg-white"
-                placeholder="Product description..."
+                className="w-full px-5 py-4 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 transition-all bg-slate-50/50 text-sm font-medium resize-none leading-relaxed"
+                placeholder="Specify hardware specifications or notes..."
               />
             </div>
           </div>
         </form>
 
-        <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+        <div className="p-6 md:p-8 border-t border-slate-50 bg-slate-50/30 flex flex-col md:flex-row gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-slate-700 font-medium hover:bg-slate-200 rounded-lg transition-colors"
+            className="order-2 md:order-1 flex-1 px-8 py-4 text-slate-500 font-black uppercase text-xs tracking-widest hover:bg-slate-100 rounded-2xl transition-all"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
-            className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 shadow-md shadow-blue-500/30 transition-all"
+            className="order-1 md:order-2 flex-1 px-8 py-4 bg-slate-900 text-white font-black uppercase text-xs tracking-widest rounded-2xl hover:bg-slate-800 shadow-xl shadow-slate-900/10 transition-all"
           >
-            {product ? 'Update Details' : 'Create Product'}
+            {product ? 'Synchronize Record' : 'Confirm & Create'}
           </button>
         </div>
 

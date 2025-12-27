@@ -62,7 +62,7 @@ const Logs: React.FC<LogsProps> = ({ logs }) => {
           <div>
             <h3 className="text-xl font-black text-slate-900 flex items-center gap-3">
                 <ClipboardList className="text-blue-600" size={24} />
-                Transaction History
+                History
             </h3>
             <p className="text-xs text-slate-500 mt-1 font-medium">Audit trail of all regional stock movements.</p>
           </div>
