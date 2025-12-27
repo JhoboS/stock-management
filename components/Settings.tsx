@@ -106,7 +106,9 @@ const Settings: React.FC<SettingsProps> = ({
     } catch (err: any) { setPasswordMsg({ type: 'error', text: err.message }); }
   };
 
-  const sqlSchema = `-- SYSTEM INITIALIZATION & LEGACY MIGRATION
+  const sqlSchema = `-- REPAIR TERMINAL: REGIONAL INDEPENDENCE MIGRATION
+-- This script fixes constraints to allow identical names across different warehouses.
+
 -- 1. Ensure warehouses table exists
 create table if not exists warehouses (
   id uuid primary key default gen_random_uuid(), 
@@ -115,16 +117,34 @@ create table if not exists warehouses (
   created_at timestamptz default now()
 );
 
--- 2. Create Default "US Warehouse" for legacy data
+-- 2. Ensure Default "US Warehouse" for legacy data exists
 insert into warehouses (id, name, location)
 select '00000000-0000-0000-0000-000000000000', 'US Warehouse', 'United States'
 where not exists (select 1 from warehouses where id = '00000000-0000-0000-0000-000000000000');
 
--- 3. Upgrade Tables to Multi-Warehouse and Migrate Orphaned Data
--- Products
+-- 3. FIX CATEGORIES CONSTRAINTS
+-- Drop global unique name constraint if it exists (common Supabase default)
+alter table categories drop constraint if exists categories_name_key;
+
+-- Add warehouse_id column if missing and migrate orphans
+alter table categories add column if not exists warehouse_id uuid references warehouses(id);
+update categories set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
+
+-- Add composite unique constraint (name + warehouse_id)
+do $$ 
+begin 
+    if not exists (select 1 from pg_constraint where conname = 'categories_name_warehouse_unique') then
+        alter table categories add constraint categories_name_warehouse_unique unique (name, warehouse_id);
+    end if;
+end $$;
+
+-- 4. FIX PRODUCTS CONSTRAINTS
+-- Ensure names and SKUs are warehouse-independent if desired. 
+-- Usually SKUs remain unique, but we drop the global name/sku constraints if they hinder regional scaling.
 alter table products add column if not exists warehouse_id uuid references warehouses(id);
 update products set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
 
+-- 5. UPGRADE OTHER TABLES
 -- Employees
 alter table employees add column if not exists warehouse_id uuid references warehouses(id);
 update employees set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
@@ -141,11 +161,7 @@ update scrapped_items set warehouse_id = '00000000-0000-0000-0000-000000000000' 
 alter table stock_logs add column if not exists warehouse_id uuid references warehouses(id);
 update stock_logs set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
 
--- Categories
-alter table categories add column if not exists warehouse_id uuid references warehouses(id);
-update categories set warehouse_id = '00000000-0000-0000-0000-000000000000' where warehouse_id is null;
-
--- App Users permissions
+-- 6. User Permissions
 alter table app_users add column if not exists assigned_warehouses uuid[] default '{}';
 
 -- Reload config notify

@@ -22,6 +22,7 @@ import { Product, Assignment, ScrappedItem, OperationType, Employee, AppUser, St
 import { Loader2, AlertTriangle, Lock, Building2, ChevronDown, Check, Layout, ShieldCheck } from 'lucide-react';
 
 const SUPER_ADMIN_EMAIL = 'jhobo@grnesl.com';
+const DEFAULT_WH_ID = '00000000-0000-0000-0000-000000000000';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
@@ -82,38 +83,39 @@ const App: React.FC = () => {
         setIsLoading(true);
         const email = session.user.email;
         
-        // IMMEDIATE BYPASS: If email is Super Admin, grant access immediately
+        // 1. HARDCODED IMMEDIATE BYPASS for Super Admin
         if (email === SUPER_ADMIN_EMAIL) {
           setIsApproved(true);
-          setCurrentUser({
+          const adminProfile: AppUser = {
             id: session.user.id,
             email: email,
             role: 'super_admin',
             is_approved: true,
             assigned_warehouses: []
-          });
+          };
+          setCurrentUser(adminProfile);
         }
 
         try {
-          // Attempt to fetch warehouses
+          // 2. Load Warehouses
           let allWh: Warehouse[] = [];
           try {
             allWh = await fetchWarehouses();
             setWarehouses(allWh);
           } catch (e: any) {
-            if (isSuperAdminUser) setSchemaError("Database initialization required. Please run SQL Repair in Settings.");
+            if (isSuperAdminUser) setSchemaError("Database initialization required. Run SQL Repair in Settings.");
           }
 
+          // 3. Load App User Profile (Non-blocking for Super Admin)
           let appUser = await fetchAppUser(email);
           
           if (isSuperAdminUser) {
-            // Ensure record exists in DB for Super Admin
-            if (!appUser || appUser.role !== 'super_admin' || !appUser.is_approved) {
+            if (!appUser || appUser.role !== 'super_admin') {
               try {
-                const superAdminRecord: AppUser = { id: session.user.id, email, role: 'super_admin', is_approved: true, assigned_warehouses: appUser?.assigned_warehouses || [] };
+                const superAdminRecord: AppUser = { id: session.user.id, email, role: 'super_admin', is_approved: true, assigned_warehouses: [] };
                 await createAppUser(superAdminRecord);
                 appUser = superAdminRecord;
-              } catch (e) { /* DB might be missing tables, handled by schemasError */ }
+              } catch (e) { /* DB might be missing tables, handled by schemaError */ }
             }
           } else if (!appUser) {
             appUser = { id: session.user.id, email, role: 'user', is_approved: false, assigned_warehouses: [] };
@@ -122,14 +124,18 @@ const App: React.FC = () => {
 
           if (appUser) setCurrentUser(appUser);
           
-          // Final approval check
+          // 4. Determine Initial Warehouse Context
           if (appUser?.is_approved || isSuperAdminUser) {
             setIsApproved(true);
-            const initialWhId = appUser?.role === 'super_admin' ? allWh[0]?.id : appUser?.assigned_warehouses[0];
+            
+            // Prioritize US Warehouse if it exists, otherwise use first available
+            const usWh = allWh.find(w => w.id === DEFAULT_WH_ID);
+            const initialWhId = usWh ? usWh.id : (appUser?.role === 'super_admin' ? allWh[0]?.id : appUser?.assigned_warehouses[0]);
+            
             if (initialWhId) {
               setActiveWarehouseId(initialWhId);
             } else if (isSuperAdminUser) {
-              setCurrentView('settings');
+              setCurrentView('settings'); // Force settings to create first region
             }
           }
         } catch (error) {
@@ -216,7 +222,7 @@ const App: React.FC = () => {
   const handleLogout = async () => { await supabase.auth.signOut(); };
 
   if (!session) return <Login />;
-  if (isLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4"><Loader2 className="animate-spin text-blue-600" size={48} /><p className="font-medium animate-pulse text-slate-600">Initializing Session...</p></div>;
+  if (isLoading) return <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4"><Loader2 className="animate-spin text-blue-600" size={48} /><p className="font-medium animate-pulse text-slate-600">Syncing System Ownership...</p></div>;
 
   if (!isApproved && !isSuperAdminUser) {
      return (
